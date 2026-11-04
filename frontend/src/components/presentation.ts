@@ -92,6 +92,14 @@ export function usersGoalTip(game: GameState): string {
 }
 
 /** Series colours, shared by both modes' history charts. */
+/** A round upper bound for a chart axis: 1, 2 or 5 times a power of ten. */
+export function niceMax(v: number): number {
+  if (v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+}
+
 export const CHART_COLORS = { users: "#1f8fe0", cash: "#d18f00", revenue: "#0f9f8f", costs: "#e46a00", db: "#7b4fe0", health: "#e0386a", mood: "#1aa35a", debt: "#c41d33" };
 
 /** The icon tile for each kind of entry in the history feed. */

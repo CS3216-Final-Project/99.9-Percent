@@ -1,6 +1,7 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { advanceCampaignStep, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame, type GameState } from "../src/sim";
+import { reportWindowStart } from "../src/game/reportEvents";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 
 export function almostRecovered(limited = false): GameState {
@@ -54,9 +55,21 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const summary = report.locator("summary", { hasText: "View Technical Details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await press(summary); await expect(report.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
-  for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
+  await press(summary);
   const recoveredReport = recovered.campaign!.reports.at(-1)!;
+  // The evidence is a timeline: the pointer and the keys pick the second its readout describes, and screen readers
+  // keep every second's readings in a table that is not drawn.
+  const timeline = report.getByRole("slider", { name: "Incident timeline, game second", exact: true });
+  await expect(timeline).toBeVisible();
+  await expect(report.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeAttached();
+  const plot = (await timeline.boundingBox())!, first = recoveredReport.snapshots.find(m => m.step >= reportWindowStart(recoveredReport))!;
+  const start = { x: 60, y: plot.height / 2 };
+  if (touch) await timeline.tap({ position: start }); else await timeline.hover({ position: start });
+  await expect(timeline).toHaveAttribute("aria-valuenow", String(first.step));
+  await expect(report.locator(".timeline-readout b")).toHaveText(`Game second ${first.step}`);
+  await timeline.focus(); await page.keyboard.press("End");
+  await expect(timeline).toHaveAttribute("aria-valuenow", String(recoveredReport.snapshots.at(-1)!.step));
+  for (const explanation of recoveredReport.explanations) await expect(report).toContainText(explanation);
   const recoveryEvents = recoveredReport.events.filter(event => event.type === "recovery-streak");
   expect(recoveryEvents.length).toBeGreaterThan(0);
   await expect(report.locator(".report-events li").filter({ hasText: "Recovery progress" })).toHaveCount(recoveryEvents.length);

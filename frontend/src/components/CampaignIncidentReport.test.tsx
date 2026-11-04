@@ -60,6 +60,31 @@ it("retains every explanation, observation and event behind one collapsed techni
   expect(detail.querySelectorAll(".report-events li")).toHaveLength(describeEvents(r.events).filter(e => e.step >= from && e.step <= r.recoveredStep).length);
   expect(detail.querySelector("pre")).toBeNull();
 });
+it("plots the evidence window as a timeline whose selected second reads out every lane and highlights its events", () => {
+  const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
+  fireEvent.click(screen.getByText("View Technical Details"));
+  const from = reportWindowStart(r), window = r.snapshots.filter(m => m.step >= from);
+  const timeline = within(screen.getByRole("region", { name: "Incident timeline" }));
+  const slider = timeline.getByRole("slider", { name: "Incident timeline, game second" });
+  // It opens on the slowest second, the one that shows the incident at its worst.
+  const worst = window.reduce((a, m) => (m.latencyMs > a.latencyMs ? m : a));
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(worst.step));
+  expect(slider.getAttribute("aria-valuetext")).toContain(`Game second ${worst.step}: response time ${Math.round(worst.latencyMs).toLocaleString("en-US")} ms`);
+  expect(slider.getAttribute("aria-valuemin")).toBe(String(window[0].step));
+  fireEvent.keyDown(slider, { key: "Home" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window[0].step));
+  fireEvent.keyDown(slider, { key: "ArrowLeft" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window[0].step));
+  // Moving to the second the incident opened highlights its marker and its line in the key.
+  for (let i = window.findIndex(m => m.step === r.openedStep); i > 0; i--) fireEvent.keyDown(slider, { key: "ArrowRight" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(r.openedStep));
+  const opened = timeline.getAllByRole("listitem").find(li => li.textContent!.includes("Incident opened"))!;
+  expect(opened.hasAttribute("data-current")).toBe(true);
+  expect(opened.querySelector(".timeline-badge")!.textContent).toBe(String(timeline.getAllByRole("listitem").indexOf(opened) + 1));
+  fireEvent.keyDown(slider, { key: "End" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window.at(-1)!.step));
+  expect(opened.hasAttribute("data-current")).toBe(false);
+});
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
   const view = render(<CampaignIncidentReport report={r} />);

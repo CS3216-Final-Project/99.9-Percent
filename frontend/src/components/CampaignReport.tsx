@@ -18,7 +18,7 @@ export function ReportSections({ lesson, summary }: { lesson: ReportLesson; summ
   return <>{!sections.length && summary}{sections.map(([title, text], i) => <Fragment key={title}><section><h3 style={line(turn(i))}>{title}</h3><p style={line(turn(i) + 1)}>{text}</p></section>{i === 0 && summary && <div className="report-lesson-summary" style={line(2)}>{summary}</div>}</Fragment>)}</>;
 }
 /**
- * The player's avatar asks the questions and the colleague of the chapter the report is about answers them, so each
+ * The colleague of the chapter the report is about asks the questions and the player's avatar answers them, so each
  * bubble carries a small picture of its speaker.
  */
 function useReportSpeakers(at: number) {
@@ -29,7 +29,7 @@ function useReportSpeakers(at: number) {
 }
 /** One disclosure per report. Evidence children must not introduce nested accordions. */
 /** `summary` holds the few numbers that carry the lesson; they stay visible outside the technical disclosure. */
-/** `at` is the game second the report speaks for, which decides the colleague who answers. */
+/** `at` is the game second the report speaks for, which decides the colleague who asks. */
 export function CampaignReport({ lesson, summary, at, children }: { lesson: ReportLesson; summary?: ReactNode; at: number; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const speakers = useReportSpeakers(at);

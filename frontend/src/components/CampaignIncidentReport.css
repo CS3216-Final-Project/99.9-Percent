@@ -4,9 +4,10 @@
 .campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
 .campaign-recovery-report .modal-foot { flex: none; }
-/* A report reads as a chat: the player asks each question from the right, and the colleague of the report's chapter
-   answers from the left. The summary after the first answer (capacity after a failure) joins the conversation, its
-   heading as a question and its readings and story as answers. A small picture of the speaker sits beside each bubble. */
+/* A report reads as a chat: the colleague of the report's chapter asks each question from the right, and the player,
+   who ran the company through it, answers from the left. The summary after the first answer (capacity after a failure)
+   joins the conversation, its heading as a question and its readings and story as answers. A small picture of the
+   speaker sits beside each bubble. */
 .campaign-incident-report { --report-face: 30px; --report-side: calc(var(--report-face) + 8px); }
 :is(.campaign-incident-report, .report-lesson-summary) > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
 .report-lesson-summary { display: contents; }
@@ -57,17 +58,17 @@
 }
 :is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > h3::before {
   right: calc(-1 * var(--report-side));
-  background-image: var(--report-player);
-  background-position: center;
-  background-size: 100%;
+  background-image: var(--report-colleague);
+  background-position: center 12%;
+  background-size: 130%;
 }
 :is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(p, dl)::before {
   /* The bubble's own border sits outside its padding box, so the picture steps out by that pixel too. */
   left: calc(-1 * var(--report-side) - 1px);
   bottom: -1px;
-  background-image: var(--report-colleague);
-  background-position: center 12%;
-  background-size: 130%;
+  background-image: var(--report-player);
+  background-position: center;
+  background-size: 100%;
 }
 :is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(p, dl):has(+ :is(p, dl))::before { content: none; }
 /* As the report pops up, each question and then its answer pops up from its side like a chat message. */

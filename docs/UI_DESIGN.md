@@ -170,12 +170,17 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Escape closes a menu and returns focus to its trigger; clicking outside closes it.
   Reserve control dimensions across states and counts.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.
-  Outcome reports and postmortems read as a chat: the player asks each question in a dark bubble on the right, and the colleague who introduced the report's chapter (Maya for Launch Week and the Opening, then Alex, Jordan, Sam and Taylor) answers in a paper bubble on the left.
+  Outcome reports and postmortems read as a chat: the colleague who introduced the report's chapter (Maya for Launch Week and the Opening, then Alex, Jordan, Sam and Taylor) asks each question in a dark bubble on the right, and the player, who ran the company through it, answers in a paper bubble on the left.
   No bubble, with the room kept for its speaker's picture, is wider than 75% of the report, and a capacity summary's heading is a question and its readings table and story are answers.
-  A small round picture of the speaker sits beside the bottom of each bubble on its outer side: the player's current avatar for questions and the colleague's portrait for answers, shown once at the end of a run of answers.
+  A small round picture of the speaker sits beside the bottom of each bubble on its outer side: the colleague's portrait for questions and the player's current avatar for answers, shown once at the end of a run of answers.
   An incident report keeps the colleague of the chapter it happened in, even when read later from History.
   A report's lone action, such as Continue company, sits on the right.
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
+  An incident postmortem's View Technical Details opens on its recovery summary and then an Incident timeline: lanes on one game-second axis for demand against capacity (App Servers and Database, demand solid and capacity dashed), response time against the 500 ms limit and service errors against the 1% limit, with the incident window shaded through every lane and a faint line where each change took effect.
+  Recorded events are numbered markers on the timeline's bottom track, keyed in the list beneath it in the same colours as History's event feed.
+  The timeline opens on the slowest second and writes that second's readings above the plot; the pointer, a tap, the arrow keys, Page Up and Down, Home and End move it, and the selected second's events are highlighted in the key.
+  It is a slider for assistive technology, with the readings as its value, and every second's figures, routes and servers stay in a table that screen readers read but the page does not draw.
+  The causes list and, in Data Strategy, the workload and cache table follow the timeline.
   Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.
   On phones its actions form an even grid, two columns with the primary action last (one column on the narrowest phones), and its five ratings share their row, so nothing wraps raggedly or runs past the card; cash of a million or more is rounded like the top bar's, and so are users from ten million.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).

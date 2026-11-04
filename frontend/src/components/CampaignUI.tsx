@@ -66,9 +66,9 @@ import { SaveFiles } from "./SaveFiles";
 import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
-import type { Campaign, CampaignPostmortem, ScheduledAction, TraceEvent } from "@/sim/campaignTypes";
+import type { Campaign, CampaignPostmortem, ScheduledAction } from "@/sim/campaignTypes";
 import type { Action } from "@/sim";
-import { completedTechIds, serverName, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
+import { completedTechIds, serverName, TECH_ORDER, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -627,18 +627,6 @@ function ContinueFoot({ label, onClick }: { label: string; onClick: () => void }
   return <div className="modal-foot"><span className="muted">The same company continues.</span><button className="btn btn-primary" onClick={onClick}>{label}<Icon name="next" /></button></div>;
 }
 
-const eventKind = (e: TraceEvent | undefined): EventKind => {
-  const type = e?.type ?? "";
-  if (type === "autoscaler-blocked") return e?.data.reason ? "warning" : "success";
-  if (type.startsWith("autoscale-")) return type.includes("cancelled") ? "warning" : "decision";
-  return type === "settlement" ? "finance"
-  : /incident-opened|failure-started|bankruptcy/.test(type) ? "incident"
-  : /rejected|blocked|cancelled|superseded/.test(type) ? "warning"
-  : /recovered|restored|qualified|completed/.test(type) ? "success"
-  : /milestone|awarded|stage-entered|unlocked/.test(type) ? "milestone"
-  : /action-|acknowledged|enabled|reserved|decided/.test(type) ? "decision"
-  : "info";
-};
 /** History uses Classic's tabs: charts, the event log and the incident reports, with the step as the time unit. */
 function CampaignHistory() {
   const c = useGame(s => s.game.campaign!);
@@ -646,7 +634,6 @@ function CampaignHistory() {
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);
-  const eventTypes = new Map(c.trace.map(e => [e.id, e]));
   // Chapter outcomes are not incidents; they are listed after the incident reports, newest report first.
   const done = <span className="tag tag-ok"><Icon name="check" size={12} />Completed</span>;
   const entries: ReportEntry[] = [
@@ -669,7 +656,7 @@ function CampaignHistory() {
         <details className="more"><summary>Financial settlements</summary>{c.settlements.length ? c.settlements.map(p => <p key={p.period}>Week {p.period}: revenue {dollars(p.revenueCents)}, net {dollars(p.netCents)}</p>) : <p>No operating week has settled yet.</p>}</details>
       </div>
     </>}
-    {tab === "events" && <EventFeed className="campaign-feed" entries={describeEvents(c.trace).reverse().map(e => ({ id: e.id, kind: eventKind(eventTypes.get(e.id)), when: `Game second ${e.step}`, text: [e.title, e.detail].filter(Boolean).join(" · ") }))} />}
+    {tab === "events" && <EventFeed className="campaign-feed" entries={describeEvents(c.trace).reverse().map(e => ({ id: e.id, kind: e.kind, when: `Game second ${e.step}`, text: [e.title, e.detail].filter(Boolean).join(" · ") }))} />}
     {tab === "postmortems" && <ReportIndex entries={entries} incidents={c.reports.length} open={open} onOpen={setOpen} />}
     </HistoryTabs>
   </div>;

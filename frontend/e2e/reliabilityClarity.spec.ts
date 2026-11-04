@@ -15,8 +15,8 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const dialog = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "Capacity after the failure", "How did you respond?", "What could be improved?", "Key takeaway"]);
-  // The capacity summary joins the chat: its heading is the player's question on the right, its readings and story
-  // Taylor's answers on the left, and every bubble enters in reading order.
+  // The capacity summary joins the chat: its heading is Taylor's question on the right, its readings and story the
+  // player's answers on the left, and every bubble enters in reading order.
   const bubbles = dialog.locator(".campaign-incident-report section > :is(h3, p, dl)");
   const turns = await bubbles.evaluateAll(els => els.map(el => {
     const box = el.getBoundingClientRect(), row = el.parentElement!.getBoundingClientRect(), face = getComputedStyle(el, "::before");
@@ -25,13 +25,13 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   for (const [i, b] of turns.entries()) {
     if (i) expect(b.delay).toBeGreaterThan(turns[i - 1].delay);
     expect(b.share).toBeLessThanOrEqual(0.75);
-    if (b.tag === "H3") { expect(b.right).toBeLessThan(b.left); expect(b.face).toContain("/models/avatars/previews/fox.png"); }
+    if (b.tag === "H3") { expect(b.right).toBeLessThan(b.left); expect(b.face).toContain("/characters/taylor.webp"); }
     else expect(b.left).toBeLessThan(b.right);
   }
-  // A run of answers shows Taylor once, beside its last bubble.
+  // A run of answers shows the player's avatar once, beside its last bubble.
   for (const [i, b] of turns.entries()) if (b.tag !== "H3") {
     if (turns[i + 1] && turns[i + 1].tag !== "H3") expect(b.face).toBeNull();
-    else expect(b.face).toContain("/characters/taylor.webp");
+    else expect(b.face).toContain("/models/avatars/previews/fox.png");
   }
   expect(turns.some(b => b.tag === "DL")).toBe(true);
   // Continue company is the dialog's only action and sits on the right.
@@ -44,7 +44,8 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   await expect(dialog.getByText("Incident window", { exact: true })).toBeHidden();
   await dialog.getByText("View Technical Details", { exact: true }).click();
   await expect(dialog.getByText("Incident window", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("slider", { name: "Incident timeline, game second", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeAttached();
   await dialog.getByRole("button", { name: "Continue company", exact: true }).click();
   const after = await savedGame(page);
   expect(after.phase).toBe("management"); expect(after.campaign!.runId).toBe(c.runId);

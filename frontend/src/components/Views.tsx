@@ -6,7 +6,7 @@ import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
-import { CHART_COLORS, EVENT_STYLE, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
+import { CHART_COLORS, EVENT_STYLE, niceMax, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, Tabs } from "./ui";
 
 /* ------------------------------------------------------------------ */
@@ -111,12 +111,6 @@ interface Series {
   values: number[];
 }
 
-function niceMax(v: number): number {
-  if (v <= 0) return 1;
-  const pow = Math.pow(10, Math.floor(Math.log10(v)));
-  const n = v / pow;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
-}
 
 export function LineChart({
   title,

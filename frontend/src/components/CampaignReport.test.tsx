@@ -51,7 +51,7 @@ const speakers = (dialog: HTMLElement) => {
   return { colleague: report.dataset.speaker, player: report.style.getPropertyValue("--report-player"), portrait: report.style.getPropertyValue("--report-colleague") };
 };
 
-it("has the player's avatar ask an Opening postmortem's questions and Maya answer them", () => {
+it("has Maya ask an Opening postmortem's questions and the player's avatar answer them", () => {
   let game = act(tick(newGame(1, "report-speakers"), 6), { type: "start_db_upgrade" });
   while (game.phase !== "review") game = tick(game);
   useGame.setState({ game, ready: true, started: true, hasRun: true, onboarding: false, tour: null, avatar: "dog" }); render(<CampaignOverlays/>);
@@ -59,7 +59,7 @@ it("has the player's avatar ask an Opening postmortem's questions and Maya answe
   expect(speakers(screen.getByRole("dialog", { name: "Incident postmortem" }))).toEqual({ colleague: "maya", player: 'url("/models/avatars/previews/dog.png")', portrait: 'url("/characters/maya.webp")' });
 });
 
-it("has Taylor answer Stay Online's outcome, and the questions follow a changed avatar", () => {
+it("has Taylor ask Stay Online's outcome questions, and the answers follow a changed avatar", () => {
   useGame.setState({ game: reliabilityOutcome(), ready: true, started: true, onboarding: false, avatar: "fox" }); render(<CampaignOverlays/>);
   const outcome = () => screen.getByRole("dialog", { name: "Reliability outcome" });
   expect(speakers(outcome())).toEqual({ colleague: "taylor", player: 'url("/models/avatars/previews/fox.png")', portrait: 'url("/characters/taylor.webp")' });
