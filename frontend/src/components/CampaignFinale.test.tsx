@@ -13,7 +13,9 @@ const finale = () => screen.queryByRole("dialog", { name: "Campaign finale" });
 const scorecard = () => screen.queryByRole("dialog", { name: "Campaign complete" });
 const next = () => within(finale()!).queryByRole("button", { name: "Next" });
 const portrait = () => finale()!.querySelector<HTMLImageElement>(".dialogue-portrait")!;
-const show = (game = won) => { useGame.setState({ game, ready: true, started: true, onboarding: false, view: null }); return render(<StrictMode><CampaignOverlays/></StrictMode>); };
+/** As in the game, the Guided Mode overlays give way once the loaded company is a Challenge Mode one. */
+const Overlays = () => useGame(s => !!s.game.campaign) ? <CampaignOverlays/> : null;
+const show = (game = won) => { useGame.setState({ game, ready: true, started: true, onboarding: false, view: null }); return render(<StrictMode><Overlays/></StrictMode>); };
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -77,6 +79,27 @@ it("remembers a finished finale for the session when storage is unavailable", ()
   const game = structuredClone(won); game.campaign!.scorecard!.runId = "finale-without-storage";
   show(game); fireEvent.keyDown(finale()!, { key: "Escape" });
   cleanup(); show(game); expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
+});
+
+it("continues from the scorecard into Challenge Mode, saving the finished company first", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const go = within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" });
+  expect(document.activeElement).toBe(go);
+  fireEvent.click(go);
+  expect(useGame.getState().mode).toBe("classic");
+  expect(useGame.getState().game.campaign).toBeUndefined();
+  expect(localStorage.getItem("nn.mode.v1")).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("asks before losing a finished company that cannot be saved, then switches when asked again", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  expect(scorecard()!.textContent).toContain("This company could not be saved");
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
+  expect(useGame.getState().mode).toBe("classic");
 });
 
 it("preloads every celebrating portrait when the finale opens", () => {

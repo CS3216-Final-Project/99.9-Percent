@@ -159,6 +159,8 @@ A company that stays keeps operating, and Next in the chapter bar offers Complet
 Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line.
 Taylor's line counts the recorded incidents, and the last line shows uptime (when known) and incidents from the recorded scorecard.
 Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
+The scorecard ends on Inspect final company, Export or start a new company, and Continue to Challenge Mode, which saves the finished company and switches to Challenge Mode, now unlocked.
+When the company cannot be saved, Continue to Challenge Mode first warns that switching loses it and switches only when pressed again.
 
 The final scorecard separates settled and pending revenue, setup and operating costs, and salaries.
 It reports rejected demand separately from service errors, plus architecture, technologies, incident count, service-health uptime and the longest degraded span.
