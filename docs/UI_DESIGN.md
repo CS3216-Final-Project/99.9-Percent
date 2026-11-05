@@ -144,8 +144,11 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   A completed Launch Week offers Replay Launch Week and a completed Challenge Mode guide offers Replay tutorial: Challenge Mode's restarts the first week, Guided Mode's starts a fresh practice company and restores the original company on Finish or Exit, and a company that has ended has none.
   Until Chapter 5, Stay Online, is complete, Challenge Mode is not a card: the Guided Mode card stands alone and a short teaser below it, with no controls, names the goal (“Grow to 50,000 users in 26 weeks on your own.”), says “Unlocks after Chapter 5: Stay Online.”, adds the player's current chapter once there is one, and shows five chapter pips, the last of which is the goal.
   The mode played last gets a yellow “Last played” tag, and on devices with a fine pointer keyboard focus starts on its button.
-  Choosing the other mode switches to it at once and keeps the first mode's save; when the current run cannot be saved, the button turns red as “Switch and lose this run” with a warning inside that card, which points to Menu, Saves for export where the edition has it.
-  The same warning and red button (“Switch and lose this company” on the final scorecard) last only while the run is unsaved: once a later save succeeds, an autosave or Save now, they are withdrawn and the next press saves the run before switching.
+  Choosing the other mode switches to it at once and keeps the first mode's save; when the loaded mode's save fails, the button turns red with a warning inside that card, which points to Menu, Saves for export where the edition has it.
+  Every mode switch, on the home screen, in the menu and on Guided Mode's final scorecard on desktop and phone, names what would be lost in the mode being left, as New company and New game do: “Switch and lose this company” and “This company could not be saved” when leaving Guided Mode, “Switch and lose this run” and “This run could not be saved” when leaving Challenge Mode.
+  The home screen's card names the mode too (“Your Guided Mode company could not be saved”), since the warning sits in the other mode's card.
+  The words come from `loseWording` in `useModeSwitch.ts`.
+  The warning and red button last only while the save is failing: once a later save succeeds, an autosave or Save now, they are withdrawn and the next press saves before switching.
   A failed autosave never raises the warning by itself; only a pressed switch does.
   No run starts before a choice.
   Anonymous analytics is on by default.

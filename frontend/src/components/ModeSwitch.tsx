@@ -4,7 +4,7 @@ import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
-import { useModeSwitch } from "./useModeSwitch";
+import { loseWording, useModeSwitch } from "./useModeSwitch";
 
 const ABOUT: Record<GameMode, string> = {
   campaign: "Guided Mode teaches infrastructure concepts through five guided chapters of continuous play.",
@@ -25,6 +25,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
   const defaultLocked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
   const locked = lockedOverride ?? defaultLocked;
   const from: GameMode = to === "campaign" ? "classic" : "campaign";
+  const lose = loseWording(from);
   return (
     <section className="menu-section" aria-label="Game mode">
       <h4>
@@ -52,13 +53,13 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
             onClick={(e) => switchTo(to, e.currentTarget)}
           >
             <Icon name="switch" size={20} />
-            {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
+            {unsaved ? lose.button : `Switch to ${NAME[to]}`}
           </button>
         </div>
       )}
       {unsaved && !locked && (
         <Callout compact tone="warn" icon="alert" kicker="Not saved" live="alert">
-          This run could not be saved, so switching now loses it. Press "Switch and lose this run" again to switch anyway.
+          {lose.warning()}
         </Callout>
       )}
     </section>

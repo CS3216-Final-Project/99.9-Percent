@@ -2,6 +2,21 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 
+/** What leaving a mode loses: Guided Mode keeps a company and Challenge Mode a run, as New company and New game say. */
+export const SAVE_NOUN: Record<GameMode, "company" | "run"> = { campaign: "company", classic: "run" };
+
+/**
+ * The red button and warning shown once a failed save has refused a switch away from `from`, the loaded mode. Every
+ * control that switches modes takes its words from here, so they name the same thing. `subject` and `then` let a
+ * caller say whose save it was and where else to go.
+ */
+export function loseWording(from: GameMode) {
+  const noun = SAVE_NOUN[from], button = `Switch and lose this ${noun}`;
+  const warning = (subject = `This ${noun}`, then = "") =>
+    `${subject} could not be saved, so switching now loses it. Press "${button}" again to switch anyway${then}.`;
+  return { noun, button, warning };
+}
+
 /**
  * Switch modes, asking before losing a run that could not be saved. `unsaved` names the mode whose switch a failed save
  * refused; switching to it again goes ahead without the save. A switch refused for another reason, such as a cloud

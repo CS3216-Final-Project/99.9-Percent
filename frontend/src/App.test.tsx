@@ -7,7 +7,7 @@ import { DEFAULT_META, saveMeta, saveGame } from "./game/persist";
 import { newGame } from "./sim";
 vi.mock("./components/scene/Facility", () => ({ default: () => <div data-testid="facility" /> }));
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 it("lets new players compare both modes without starting a run for them", () => {
   vi.useFakeTimers();
   render(<StrictMode><App /></StrictMode>);
@@ -49,19 +49,19 @@ it("keeps the mode choice open when switching cannot preserve the stored save", 
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Start Challenge Mode" }));
   expect(useGame.getState().started).toBe(false);
-  expect(screen.getByRole("button", { name: "Switch and lose this run" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Switch and lose this company" })).toBeTruthy();
   expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
   expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
 });
 
-it("withdraws the menu's lose-this-run warning once Save now succeeds, and then saves before switching", () => {
+it("withdraws the menu's lose-this-company warning once Save now succeeds, and then saves before switching", () => {
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const menu = openMenu();
   const modes = within(menu).getByRole("region", { name: "Game mode" });
   const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
   fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
-  expect(within(modes).getByRole("alert").textContent).toContain("This run could not be saved");
+  expect(within(modes).getByRole("alert").textContent).toContain("This company could not be saved");
   // Storage recovers and the player saves from the same menu: the run is safe again.
   setItem.mockRestore();
   fireEvent.click(within(menu).getByRole("button", { name: /Save now/ }));
@@ -71,6 +71,20 @@ it("withdraws the menu's lose-this-run warning once Save now succeeds, and then 
   fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
   expect(useGame.getState().mode).toBe("classic");
   expect(localStorage.getItem("nn.campaign.save.v1")).not.toBeNull();
+});
+
+// Guided Mode keeps a company and Challenge Mode a run, as their New company and New game confirmations say.
+it.each([
+  { from: "Guided Mode", start: "Start Guided Mode", to: "Challenge Mode", lost: "company" },
+  { from: "Challenge Mode", start: "Start Challenge Mode", to: "Guided Mode", lost: "run" },
+])("names the $lost a failed save would lose when switching away from $from", ({ start, to, lost }) => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: start }));
+  const modes = within(openMenu()).getByRole("region", { name: "Game mode" });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(modes).getByRole("button", { name: `Switch to ${to}` }));
+  expect(within(modes).getByRole("alert").textContent).toBe(`This ${lost} could not be saved, so switching now loses it. Press "Switch and lose this ${lost}" again to switch anyway.`);
+  expect(within(modes).getByRole("button", { name: `Switch and lose this ${lost}` })).toBeTruthy();
 });
 
 it("shows the locked unlock prompt in the menu instead of a switch control", () => {

@@ -67,7 +67,7 @@ test("the menu offers a disabled unlock instead of a switch while Challenge Mode
   expect(await page.evaluate(() => localStorage.getItem("nn.classic.save.v1"))).toBeNull();
 });
 
-test("asks before switching away from a run that cannot be saved", async ({ page, withoutRoom }) => {
+test("asks before switching away from a company that cannot be saved", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await unlockChallenge(page);
   await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("nn.campaign.save.v1", "{"); } });
@@ -75,13 +75,13 @@ test("asks before switching away from a run that cannot be saved", async ({ page
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("button", { name: "Switch to Challenge Mode" }).click();
-  await expect(menu.getByRole("alert").filter({ hasText: "This run could not be saved" })).toBeVisible();
-  await menu.getByRole("button", { name: "Switch and lose this run" }).click();
+  await expect(menu.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
+  await menu.getByRole("button", { name: "Switch and lose this company" }).click();
   await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
 });
 
-test("withdraws the menu's lose-this-run warning once storage recovers and Save now succeeds", async ({ page, withoutRoom }) => {
+test("withdraws the menu's lose-this-company warning once storage recovers and Save now succeeds", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await seedSave(page, newGame(1, "recovered-storage"), { challengeUnlocked: true });
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
@@ -90,12 +90,12 @@ test("withdraws the menu's lose-this-run warning once storage recovers and Save 
   // The browser's storage fills up, so the switch is refused with a warning.
   await page.evaluate(() => { const w = window as unknown as { realSetItem: Storage["setItem"] }; w.realSetItem = Storage.prototype.setItem; Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
   await modes.getByRole("button", { name: "Switch to Challenge Mode" }).click();
-  await expect(modes.getByRole("alert").filter({ hasText: "This run could not be saved" })).toBeVisible();
+  await expect(modes.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
   // Space is freed and Save now keeps the run, so nothing would be lost any more.
   await page.evaluate(() => { Storage.prototype.setItem = (window as unknown as { realSetItem: Storage["setItem"] }).realSetItem; });
   await menu.getByRole("button", { name: /Save now/ }).click();
   await expect(modes.getByRole("alert")).toHaveCount(0);
-  await expect(modes.getByRole("button", { name: "Switch and lose this run" })).toHaveCount(0);
+  await expect(modes.getByRole("button", { name: "Switch and lose this company" })).toHaveCount(0);
   // The switch saves the run again before it leaves, instead of discarding it.
   await page.evaluate(() => localStorage.removeItem("nn.campaign.save.v1"));
   await modes.getByRole("button", { name: "Switch to Challenge Mode" }).click();
