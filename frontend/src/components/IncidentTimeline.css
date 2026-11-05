@@ -33,9 +33,15 @@
 .timeline-marker circle { stroke: var(--paper); stroke-width: 1.5; }
 .timeline-marker text { fill: var(--paper); font-family: var(--font-num); font-size: 9px; font-weight: 700; pointer-events: none; }
 .timeline-marker[data-current] circle { stroke: var(--ink); stroke-width: 2; }
+/* Events folded into one marker are of mixed kinds, so it is drawn in no kind's colour; selected, it fills like their key lines. */
+.timeline-marker.is-folded circle { fill: var(--paper); stroke: var(--ink); }
+.timeline-marker.is-folded text { fill: var(--ink); }
+.timeline-marker.is-folded[data-current] circle { fill: var(--selection); }
 /* The key: each event's number matches its marker, and the selected second's events are highlighted. */
 .incident-timeline .report-events { margin-top: 10px; }
 .incident-timeline .report-events li { grid-template-columns: 4.5em minmax(0, 1fr); padding: 2px 4px; border-radius: 6px; }
 .incident-timeline .report-events li[data-current] { background: var(--selection); }
-.incident-timeline .report-event-step { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
+/* The badges line up at the column's left edge and the seconds at its right, however many digits a second has, both on
+   the event's first line. */
+.incident-timeline .report-event-step { display: flex; align-self: start; align-items: baseline; justify-content: space-between; gap: 6px; }
 .timeline-badge { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; color: var(--paper); font-size: 9px; line-height: 1; align-self: center; }

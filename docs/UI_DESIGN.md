@@ -182,6 +182,9 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
   An incident postmortem's View Technical Details opens on its recovery summary and then an Incident timeline: lanes on one game-second axis for demand against capacity (App Servers and Database, demand solid and capacity dashed), response time against the 500 ms limit and service errors against the 1% limit, with the incident window shaded through every lane and a faint line where each change took effect.
   Recorded events are numbered markers on the timeline's bottom track, keyed in the list beneath it in the same colours as History's event feed.
+  Markers too close to sit side by side stack upwards, at most three high, so the track never grows past three markers.
+  Events that would stack higher fold into the top marker at that spot, drawn in paper and ink and labelled "+n" for the n events it stands for; it fills with the selection colour when the selected second is one of theirs.
+  The key still lists every event under its own number, with each badge on the event's first line, aligned in one column whatever the second's digits.
   The timeline opens on its worst second, the one furthest past the 500 ms or 1% limit, and writes that second's readings above the plot; the pointer, a tap, the arrow keys, Page Up and Down, Home and End move it, and the selected second's events are highlighted in the key.
   It is a slider for assistive technology, with the readings as its value, and every second's figures, routes and servers stay in a table that screen readers read but the page does not draw.
   The causes list and, in Data Strategy, the workload and cache table follow the timeline.

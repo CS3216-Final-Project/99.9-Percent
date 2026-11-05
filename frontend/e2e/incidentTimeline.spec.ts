@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect, seedSave, expectRoom } from "./fixtures";
-import { newGame } from "../src/sim";
+import { applyAction, newGame, type Action, type GameState } from "../src/sim";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 
 /** An Opening incident answered late: the Database upgrade comes 40 game seconds in, so the window is long and its events crowd. */
@@ -11,12 +11,30 @@ function slowResponse() {
   return g;
 }
 
+/**
+ * An Opening incident left alone for two game minutes, then a burst of a dozen decisions within a few seconds: the
+ * burst's markers crowd one spot on a long axis.
+ */
+function crowdedResponse() {
+  const tried = (g: GameState, a: Action) => { const r = applyAction(g, a); return r.ok ? r.state : g; };
+  let g = newGame(1, "crowded");
+  for (let i = 0; i < 300 && !g.campaign!.incident; i++) g = tick(g);
+  g = tick(g, 120);
+  for (let i = 0; i < 6; i++) g = tried(tried(g, { type: "set_traffic_limit", enabled: g.campaign!.limit === null }), { type: "add_server" });
+  g = tick(g);
+  for (let i = 0; i < 4; i++) g = tick(tried(g, { type: "set_traffic_limit", enabled: g.campaign!.limit === null }));
+  g = tried(g, { type: "start_db_upgrade" });
+  for (let i = 0; i < 300 && g.phase !== "review"; i++) g = tick(g);
+  expect(g.phase).toBe("review");
+  return g;
+}
+
 /** What the timeline draws, measured in the page: everything must sit inside its plot, apart and readable. */
 function measure(slider: Locator) {
   return slider.evaluate(plot => {
     const box = plot.getBoundingClientRect(), svg = plot.querySelector("svg")!;
     const texts = [...svg.querySelectorAll("text")].map(t => { const { x, y, width, height } = t.getBBox(); return { text: t.textContent!, x, y, width, height }; });
-    const markers = [...svg.querySelectorAll(".timeline-marker circle")].map(c => ({ x: +c.getAttribute("cx")!, y: +c.getAttribute("cy")!, r: +c.getAttribute("r")! }));
+    const markers = [...svg.querySelectorAll(".timeline-marker circle")].map(c => ({ x: +c.getAttribute("cx")!, y: +c.getAttribute("cy")!, r: +c.getAttribute("r")!, label: c.nextElementSibling!.textContent! }));
     const bottom = Math.max(...markers.map(m => m.y)) + 9;
     // Each limit label's glyphs must stay clear of the stroke of the line plotted in its own lane.
     const ink = document.createElement("canvas").getContext("2d")!;
@@ -32,7 +50,7 @@ function measure(slider: Locator) {
       }
       return { text: label.textContent!, hits };
     });
-    return { left: box.left, right: box.right, width: svg.viewBox.baseVal.width, drawn: svg.getBoundingClientRect().toJSON() as DOMRect, texts, markers, labelHits, axis: texts.filter(t => t.y > bottom) };
+    return { left: box.left, right: box.right, width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height, drawn: svg.getBoundingClientRect().toJSON() as DOMRect, texts, markers, labelHits, axis: texts.filter(t => t.y > bottom) };
   });
 }
 const overlaps = (a: { x: number; width: number }, b: { x: number; width: number }) => a.x < b.x + b.width && b.x < a.x + a.width;
@@ -115,4 +133,25 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 640]]) test(`incid
   await expectTidy(read);
   await read.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath(`history-${width}.png`) });
+});
+
+for (const [width, height] of [[1440, 900], [320, 640]]) test(`a burst of events folds into a cluster instead of stacking the track out of the report at ${width} px`, async ({ page, withoutRoom }, info) => {
+  await withoutRoom();
+  await page.setViewportSize({ width, height });
+  const game = crowdedResponse();
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
+  const slider = await openTimeline(page, report);
+  const plot = await expectTidy(slider);
+  // Markers stack at most three high; the rest at that spot fold into one "+n" marker, and between them every
+  // event is drawn once.
+  expect(new Set(plot.markers.map(m => m.y)).size).toBeLessThanOrEqual(3);
+  const folded = plot.markers.filter(m => m.label.startsWith("+")), key = report.getByRole("list", { name: "Recorded events", exact: true }).getByRole("listitem");
+  expect(folded.length).toBeGreaterThan(0);
+  expect(plot.markers.length - folded.length + folded.reduce((n, m) => n + Number(m.label.slice(1)), 0)).toBe(await key.count());
+  // So the plot is never taller than three levels of markers make it, however many events crowd one spot.
+  expect(plot.height).toBeLessThanOrEqual(425);
+  await slider.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath(`crowded-${width}.png`) });
 });

@@ -8,8 +8,9 @@ import "./IncidentTimeline.css";
 const num = (n: number) => n.toLocaleString("en-US");
 const percent = (rate: number) => `${(rate * 100).toFixed(2)}%`;
 const LATENCY_LIMIT_MS = 500, ERROR_LIMIT = 0.01;
-// A character's rough width in the extra-small labels, to fit them before they are drawn; a marker's width plus a hairline.
-const CHAR = 6.8, MARKER = 15;
+// A character's rough width in the extra-small labels, to fit them before they are drawn; a marker's width plus a hairline;
+// and how many markers the events track stacks before it folds the rest at a spot into one.
+const CHAR = 6.8, MARKER = 15, LEVELS = 3;
 const LONGEST_TITLE = "Demand and capacity per second";
 const KIND_COLOR: Record<EventKind, string> = { incident: "var(--critical-ink)", success: "var(--ok-ink)", decision: "var(--ink)", warning: "var(--warn-ink)", milestone: "var(--tile-gold-ink)", finance: CHART_COLORS.cash, info: "var(--text-soft)" };
 
@@ -100,13 +101,16 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
   const titleX = L + LONGEST_TITLE.length * CHAR <= W ? L : 0;
   const x = (step: number) => L + ((W - L - R) * (step - from)) / Math.max(1, to - from);
   const lane = (top: number, height: number, max: number) => (v: number) => top + height - (height * Math.min(v, max)) / max;
-  // A marker too close to an earlier one to sit beside it is lifted to the lowest level it clears.
-  const ends: number[] = [];
-  const markers = events.map((e, i) => {
+  // A marker too close to an earlier one to sit beside it is lifted to the lowest level it clears. Where it clears
+  // none, it folds into the top level's last marker, which then counts the events it stands for, so a burst of
+  // decisions never stacks the track taller than the report.
+  const keyed = events.map((e, i) => ({ ...e, n: i + 1 })), ends: number[] = [];
+  const markers: { x: number; level: number; events: typeof keyed }[] = [];
+  for (const e of keyed) {
     const cx = x(e.step), free = ends.findIndex(end => cx - end >= MARKER), level = free < 0 ? ends.length : free;
-    ends[level] = cx;
-    return { ...e, n: i + 1, level };
-  });
+    if (level < LEVELS) { ends[level] = cx; markers.push({ x: cx, level, events: [e] }); }
+    else markers.findLast(m => m.level === LEVELS - 1)!.events.push(e);
+  }
   const deepest = Math.max(1, ends.length);
   // Each lane's title sits in the gap above it, clear of the previous lane's lowest tick and of the incident label.
   const GAP = 38, load = { top: 44, height: 96 }, latency = { top: load.top + load.height + GAP, height: 56 };
@@ -187,10 +191,14 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
 
         {laneTitle(track.top, "Events")}
         <line x1={L} x2={W - R} y1={bottom} y2={bottom} className="timeline-axis" />
-        {markers.map(e => <g key={e.id} className="timeline-marker" data-current={e.step === current.step || undefined}>
-          <circle cx={x(e.step)} cy={bottom - 9 - e.level * MARKER} r={7} fill={KIND_COLOR[e.kind]} />
-          <text x={x(e.step)} y={bottom - 9 - e.level * MARKER + 3} textAnchor="middle">{e.n}</text>
-        </g>)}
+        {markers.map(({ x: cx, level, events: [first, ...more] }) => {
+          const cy = bottom - 9 - level * MARKER, label = more.length ? `+${more.length + 1}` : String(first.n);
+          return <g key={first.id} className={`timeline-marker${more.length ? " is-folded" : ""}`} data-current={[first, ...more].some(e => e.step === current.step) || undefined}>
+            <circle cx={cx} cy={cy} r={7} fill={more.length ? undefined : KIND_COLOR[first.kind]} />
+            {/* A count of ten or more is squeezed to stay inside its marker. */}
+            <text x={cx} y={cy + 3} textAnchor="middle" {...label.length > 2 && { textLength: 12, lengthAdjust: "spacingAndGlyphs" }}>{label}</text>
+          </g>;
+        })}
         {secondTicks(from, to, x).map(({ t, anchor }) => <text key={t} x={x(t)} y={bottom + 15} textAnchor={anchor} className="chart-tick">{t}</text>)}
         <text x={L - 6} y={bottom + 15} textAnchor="end" className="chart-tick">Second</text>
 
@@ -200,7 +208,7 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
         {current.serviceErrorRate !== null && dot(x(current.step), errorY(current.serviceErrorRate), CHART_COLORS.costs)}
       </svg>
     </div>
-    {events.length ? <ol className="report-events" aria-label="Recorded events">{markers.map(e => <li key={e.id} data-current={e.step === current.step || undefined}>
+    {events.length ? <ol className="report-events" aria-label="Recorded events">{keyed.map(e => <li key={e.id} data-current={e.step === current.step || undefined}>
       <span className="report-event-step"><b className="timeline-badge" style={{ background: KIND_COLOR[e.kind] }} aria-hidden="true">{e.n}</b>{e.step}</span>
       <span><b>{e.title}</b>{e.detail && <small>{e.detail}</small>}</span>
     </li>)}</ol> : <p>No event history was retained.</p>}

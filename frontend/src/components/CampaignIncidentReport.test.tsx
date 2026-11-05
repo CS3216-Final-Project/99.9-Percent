@@ -9,6 +9,7 @@ import { CampaignIncidentReport, CapacityAfterFailure } from "./CampaignIncident
 import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
+import { IncidentTimeline } from "./IncidentTimeline";
 
 let serial = 0;
 function recovery() {
@@ -87,6 +88,26 @@ it("plots the evidence window as a timeline whose selected second reads out ever
   fireEvent.keyDown(slider, { key: "End" });
   expect(slider.getAttribute("aria-valuenow")).toBe(String(window.at(-1)!.step));
   expect(opened.hasAttribute("data-current")).toBe(false);
+});
+it("stacks a burst of events at most three high and folds the rest at that spot into one counted marker", () => {
+  const r = recovery().campaign!.reports[0], snapshots = r.snapshots.filter(m => m.step >= reportWindowStart(r)), step = r.openedStep;
+  const events = Array.from({ length: 12 }, (_, i) => ({ id: i, step, title: `Decision ${i + 1}`, detail: null, kind: "decision" as const }));
+  const { container } = render(<IncidentTimeline snapshots={snapshots} events={events} trace={[]} openedStep={r.openedStep} recoveredStep={r.recoveredStep} focusable />);
+  const markers = [...container.querySelectorAll(".timeline-marker")];
+  expect(markers.map(m => m.textContent)).toEqual(["1", "2", "+10"]);
+  expect(new Set(markers.map(m => m.querySelector("circle")!.getAttribute("cy"))).size).toBe(3);
+  // The track is never taller than three markers: twelve stacked would make the plot 560 px tall.
+  expect(container.querySelector("svg")!.getAttribute("height")).toBe("425");
+  // The key still names every event under its own number.
+  const key = within(screen.getByRole("list", { name: "Recorded events" })).getAllByRole("listitem");
+  expect(key.map(li => li.querySelector(".timeline-badge")!.textContent)).toEqual(events.map((_, i) => String(i + 1)));
+  // Selecting their second highlights the folded marker and every event it stands for.
+  const slider = screen.getByRole("slider", { name: "Incident timeline, game second" });
+  fireEvent.keyDown(slider, { key: "Home" });
+  for (let i = snapshots.findIndex(m => m.step === step); i > 0; i--) fireEvent.keyDown(slider, { key: "ArrowRight" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(step));
+  expect(markers.every(m => m.hasAttribute("data-current"))).toBe(true);
+  expect(key.every(li => li.hasAttribute("data-current"))).toBe(true);
 });
 it("opens a failure whose response time stays flat on a second that failed requests, not on a calm one", () => {
   const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
