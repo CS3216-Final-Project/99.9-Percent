@@ -6,7 +6,8 @@ import { PendingDeployments } from "./PendingDeployments";
 import { AutoscaleCallout } from "./AutoscaleCallout";
 import "./ControlsDock.css";
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { completedTechIds, metrics, TECH_ORDER, userGoal, weekLimit } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
@@ -188,18 +189,56 @@ export function ClassicViewSheet() {
   );
 }
 
+/** The dialog open on top, watched only while `watching`. */
+function useOpenModal(watching: boolean) {
+  const [modal, setModal] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!watching) return;
+    const find = () => setModal(Array.from(document.querySelectorAll<HTMLElement>(".modal")).at(-1) ?? null);
+    find();
+    const observer = new MutationObserver(find);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => { observer.disconnect(); setModal(null); };
+  }, [watching]);
+  return watching ? modal : null;
+}
+
 export function ToastHost() {
   const toast = useGame((s) => s.toast);
   const dismiss = useGame((s) => s.dismissToast);
+  // Over an open dialog the toast is in it, as screen readers hear nothing outside it. A dialog reaching down to where
+  // the toast floats takes it as its last row instead, as compact as its own messages, so it covers none of the
+  // dialog's actions; later toasts take the same row. The row stays until it is pressed, replaced or its dialog closes:
+  // leaving on a timer would move the actions back under the pointer, and a repeated note, such as an autosave failing
+  // every ten seconds, would move them each time.
+  const modal = useOpenModal(!!toast), note = useRef<HTMLDivElement>(null);
+  const [joined, setJoined] = useState<HTMLElement | null>(null);
+  const inline = !!modal && joined === modal;
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || inline) return;
     const t = window.setTimeout(dismiss, toast.kind === "error" ? 5200 : 2800);
     return () => window.clearTimeout(t);
-  }, [toast, dismiss]);
+  }, [toast, dismiss, inline]);
+  // A row goes with its dialog rather than floating on over what is left.
+  const host = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (inline) host.current = modal;
+    else if (host.current) { host.current = null; if (toast) dismiss(); }
+  }, [inline, modal, toast, dismiss]);
+  useLayoutEffect(() => {
+    const el = note.current;
+    setJoined(modal && el && modal.getBoundingClientRect().bottom > innerHeight - parseFloat(getComputedStyle(el).bottom) - el.offsetHeight ? modal : null);
+  }, [modal, toast]);
+  useLayoutEffect(() => {
+    // The row takes its room from the dialog's scrolling body, which must not hide the control just pressed.
+    const active = document.activeElement;
+    if (inline && active instanceof HTMLElement && modal?.contains(active)) active.scrollIntoView({ block: "nearest" });
+  }, [inline, modal, toast]);
   if (!toast) return null;
-  return (
-    <div className="toast" onClick={dismiss}>
+  const body = (
+    <div ref={note} className={`toast${inline ? " toast-inline" : ""}`} onClick={dismiss}>
       <Callout
+        compact={inline}
         tone={toast.kind === "error" ? "critical" : toast.kind === "success" ? "success" : "info"}
         icon={toast.milestone ? "goal" : toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
         kicker={toast.milestone ? "Milestone" : toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
@@ -209,6 +248,7 @@ export function ToastHost() {
       </Callout>
     </div>
   );
+  return modal ? createPortal(body, modal) : body;
 }
 
 /** The boot screen, shown until the store has loaded the saved settings and game. */

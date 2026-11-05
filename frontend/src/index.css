@@ -5128,6 +5128,25 @@ button:disabled {
   box-shadow: var(--lift);
 }
 
+/* A dialog that reaches down to the toast takes it as its last row, so it covers none of the dialog's actions. */
+.modal > .toast-inline {
+  position: static;
+  flex: none;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding: 8px 18px 14px;
+}
+
+.modal > .toast-inline .callout {
+  box-shadow: none;
+}
+
+/* The control kept in view above it keeps the body's own margin. */
+.modal:has(> .toast-inline) :focus {
+  scroll-margin-block: 18px;
+}
+
 /* ---------------------------------------------------------------- */
 /* Smaller screens                                                   */
 /* ---------------------------------------------------------------- */

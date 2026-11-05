@@ -158,6 +158,8 @@ export interface Toast {
   kind: "info" | "error" | "success";
   /** A milestone reads as one rather than as a finished action. */
   milestone?: boolean;
+  /** It says the company could not be saved, which a dialog warning that the company is not saved already says. */
+  unsaved?: boolean;
 }
 
 /** The player's latest decision and whether the game accepted it. */
@@ -385,7 +387,7 @@ interface Store {
   toggleMute: () => void;
   /** Change the graphics settings, remembered for next time. An unknown quality is ignored; the field of view is kept in range. */
   setGraphics: (patch: Partial<GraphicsSettings>) => void;
-  notify: (text: string, kind?: Toast["kind"]) => void;
+  notify: (text: string, kind?: Toast["kind"], about?: Pick<Toast, "unsaved">) => void;
   dismissToast: () => void;
 }
 
@@ -477,7 +479,7 @@ export const useGame = create<Store>()((set, get) => {
       set({measurement:{...s.measurement,pending:[]}});
       return finish(true);
     }
-    s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error");
+    s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error",{unsaved:true});
     return finish(false);
   }
   function uiEvent(name:string,data:Record<string,string|number|boolean|null>={}) {
@@ -1183,7 +1185,7 @@ export const useGame = create<Store>()((set, get) => {
     },
     setRunning: (running) => {
       set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { deployRush: false }) });
-      if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
+      if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error", { unsaved: true });
     },
     setSpeed: (speed) => set({ speed, deployRush: false }),
     rushDeploy: () => { get().setRunning(true); if (get().running) set({ deployRush: true }); },
@@ -1271,7 +1273,7 @@ export const useGame = create<Store>()((set, get) => {
     saveNow: (quiet = false) => {
       if(get().game.campaign) get().measureTime();
       const saved=persist();
-      if(!quiet || !saved) get().notify(saved ? "Saved" : "Could not save: browser storage is unavailable.", saved ? "success" : "error");
+      if(!quiet || !saved) get().notify(saved ? "Saved" : "Could not save: browser storage is unavailable.", saved ? "success" : "error", saved ? {} : { unsaved: true });
       return saved;
     },
 
@@ -1475,7 +1477,7 @@ export const useGame = create<Store>()((set, get) => {
       set({ rating });
     },
 
-    notify: (text, kind = "info") => set({ toast: { id: toastId++, text, kind } }),
+    notify: (text, kind = "info", about = {}) => set({ toast: { id: toastId++, text, kind, ...about } }),
     dismissToast: () => set({ toast: null }),
   };
 });

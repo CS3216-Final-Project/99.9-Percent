@@ -1,5 +1,5 @@
 import type { Locator, Page, TestInfo } from "@playwright/test";
-import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
+import { test, expect, expectRoom, expectUnsavedWarningOnce, savedGame, seedSave } from "./fixtures";
 import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 
 test.use({ reviewCampaignFinale: false, edition: "desktop" });
@@ -160,7 +160,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, {
   await expect(scorecard.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
   const actions = scorecard.locator(".campaign-complete-foot > .btn");
   await expect(actions).toHaveCount(3);
-  for (const action of await actions.all()) await expect(action).toBeInViewport({ ratio: 1 });
+  await expectUnsavedWarningOnce(page, scorecard, actions);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(size.width);
   // The pointer that pressed it is still over the red button: its white label stays readable hovered, at rest and pressed.
   const { x, y, width, height } = (await lose.boundingBox())!;

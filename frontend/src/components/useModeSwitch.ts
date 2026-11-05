@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
+import { useUnsavedWarning, withdrawUnsavedToast } from "./unsavedWarning";
 
 /** What leaving a mode loses: Guided Mode keeps a company and Challenge Mode a run, as New company and New game say. */
 export const SAVE_NOUN: Record<GameMode, "company" | "run"> = { campaign: "company", classic: "run" };
@@ -24,6 +25,7 @@ export function loseWording(from: GameMode) {
  * the next switch tries to save again. So does a later save that succeeds, an autosave or Save now: the run is no
  * longer at risk, and the next switch saves it first. A failed autosave asks nothing by itself; only a pressed switch
  * does. `from`, the control pressed, is kept in view as the warning appears above it.
+ * While the warning shows, no toast repeats that the run is not saved.
  */
 export function useModeSwitch() {
   const [unsaved, setUnsaved] = useState<GameMode | null>(null);
@@ -33,6 +35,7 @@ export function useModeSwitch() {
   const pressed = useRef<HTMLElement | null>(null);
   // On a short phone the warning pushes the pressed button out of its scrolling dialog, where it must be pressed again.
   useLayoutEffect(() => { if (unsaved) pressed.current?.scrollIntoView?.({ block: "nearest" }); }, [unsaved]);
+  useUnsavedWarning(!!unsaved);
   const switchTo = (mode: GameMode, from?: HTMLElement) => {
     pressed.current = from ?? null;
     const s = useGame.getState();
@@ -40,7 +43,9 @@ export function useModeSwitch() {
       setUnsaved(null);
       return true;
     }
-    setUnsaved(useGame.getState().canSwitchMode(mode) ? mode : null);
+    const ask = useGame.getState().canSwitchMode(mode) ? mode : null;
+    if (ask) withdrawUnsavedToast();
+    setUnsaved(ask);
     return false;
   };
   return { unsaved, switchTo };

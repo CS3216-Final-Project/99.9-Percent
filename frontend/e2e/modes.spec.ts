@@ -1,4 +1,4 @@
-import { chooseAppProfile, completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
+import { chooseAppProfile, completeTutorial, test, expect, expectRoom, expectUncovered, expectUnsavedWarningOnce, savedGame, transitionsDone, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -101,6 +101,65 @@ test("withdraws the menu's lose-this-company warning once storage recovers and S
   await modes.getByRole("button", { name: "Switch to Challenge Mode" }).click();
   await expect(page.getByRole("button", { name: "Skip", exact: true })).toBeVisible();
   expect((await savedGame(page)).campaign!.runId).toBe("recovered-storage");
+});
+
+for (const size of [{ width: 1440, height: 900 }, { width: 320, height: 568 }]) test(`at ${size.width}px the menu says once that a run whose storage fills up cannot be switched without losing it`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock(); await page.setViewportSize(size); await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, advanceSteps(newGame(1, "full-storage"), 2).state, { challengeUnlocked: true });
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  // The browser's storage fills up after the company was saved.
+  await page.evaluate(() => {
+    const w = window as typeof window & { failedSaves?: number };
+    w.failedSaves = 0;
+    Storage.prototype.setItem = () => { w.failedSaves!++; throw new DOMException("Full", "QuotaExceededError"); };
+  });
+  await menu.getByRole("button", { name: "Switch to Challenge Mode" }).click();
+  const lose = menu.getByRole("button", { name: "Switch and lose this company" });
+  await expectUnsavedWarningOnce(page, menu, lose);
+  await page.screenshot({ path: info.outputPath(`menu-switch-unsaved-${size.width}.png`) });
+  // The ten-second autosave fails too, and does not say so again over the warning.
+  const failed = () => page.evaluate(() => (window as typeof window & { failedSaves?: number }).failedSaves);
+  const before = await failed();
+  await page.clock.runFor(10_000);
+  await expect.poll(failed).toBeGreaterThan(before!);
+  await expectUnsavedWarningOnce(page, menu, lose);
+  await lose.click();
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole("button", { name: "Skip", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).not.toBe("classic");
+});
+
+/** A toast over a dialog that reaches down to it is the dialog's last row, heard inside it, and covers no action. */
+for (const size of [{ width: 1440, height: 900 }, { width: 320, height: 568 }]) test(`at ${size.width}px a failed Save now is told inside the menu without covering its actions`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock(); await page.setViewportSize(size); await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, advanceSteps(newGame(1, "full-storage"), 2).state, { challengeUnlocked: true });
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
+  const save = menu.getByRole("button", { name: "Save now", exact: true });
+  await save.click();
+  const note = menu.getByRole("alert").filter({ hasText: "Could not save" });
+  await expect(note).toBeVisible();
+  await expect(save).toBeFocused();
+  await transitionsDone(page);
+  await page.screenshot({ path: info.outputPath(`menu-save-failed-${size.width}.png`) });
+  // The pressed button stays in view; where the whole Run tab fits, none of its controls is covered.
+  const controls = size.width > 400 ? menu.getByRole("tabpanel").getByRole("button") : save;
+  await expectUncovered(page, controls);
+  // The row stays rather than leaving on the toast's timer, which would move the actions back.
+  const at = await save.boundingBox();
+  await page.clock.runFor(6_000);
+  await expect(note).toBeVisible();
+  expect(await save.boundingBox()).toEqual(at);
+  // It goes with the menu.
+  await menu.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("the home screen is the same in both modes and can continue or switch either game", async ({ page }) => {

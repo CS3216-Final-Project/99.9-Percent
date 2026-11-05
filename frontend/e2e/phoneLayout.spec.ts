@@ -3,7 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { act, reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
-import { advanceCampaignStep, expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
+import { advanceCampaignStep, expect, expectRoom, expectUnsavedWarningOnce, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
 import { dataCompany, finishingScaling } from "../src/sim/__tests__/dataFixture";
 
 /*
@@ -351,7 +351,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) t
   await done.getByRole("button", { name: "Play Challenge Mode", exact: true }).tap();
   const lose = done.getByRole("button", { name: "Switch and lose this company", exact: true });
   await expect(done.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
-  await expect(lose).toBeInViewport({ ratio: 1 });
+  await expectUnsavedWarningOnce(page, done, done.locator(".modal-foot > .btn"));
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: info.outputPath(`phone-complete-unsaved-${size.width}.png`) });
   await lose.tap();

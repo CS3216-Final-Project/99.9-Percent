@@ -1,4 +1,4 @@
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
 import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
@@ -102,6 +102,36 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
   },
 });
 export { expect };
+
+/** Waits out running CSS transitions: reduced motion still runs every change as a 1 ms one, which must be over before anything is measured. */
+export async function transitionsDone(page: Page) {
+  await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished.catch(() => undefined))));
+}
+
+/** Each of `controls` is in view and can be pressed anywhere: no floating message, such as a toast, covers any part of it. */
+export async function expectUncovered(page: Page, controls: Locator) {
+  await transitionsDone(page);
+  const toasts = await page.locator('.toast').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON() as DOMRect));
+  for (const control of await controls.all()) {
+    await expect(control).toBeInViewport({ ratio: 1 });
+    const name = await control.textContent();
+    const box = await control.evaluate(el => el.getBoundingClientRect().toJSON() as DOMRect);
+    for (const toast of toasts) expect(toast.right <= box.left || toast.left >= box.right || toast.bottom <= box.top || toast.top >= box.bottom, `a toast covers "${name}"`).toBe(true);
+    expect(await control.evaluate(el => {
+      // Its centre and, clear of the rounded corners, its four edges.
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      return [[x, y], [r.left + 6, y], [r.right - 6, y], [x, r.top + 3], [x, r.bottom - 3]].every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
+    }), `"${name}" is covered`).toBe(true);
+  }
+}
+
+/** `dialog` says once, beside `controls`, that the company could not be saved, and no toast repeats it or covers them. */
+export async function expectUnsavedWarningOnce(page: Page, dialog: Locator, controls: Locator) {
+  await expect(dialog.getByRole('alert').filter({ hasText: 'could not be saved' })).toBeVisible();
+  // Counted at once: a toast leaves on its own after a few seconds.
+  expect(await page.getByRole('alert').allTextContents()).toEqual([expect.stringContaining('could not be saved')]);
+  await expectUncovered(page, controls);
+}
 
 /** The first incident's one-time card, which frames Run with the incident loop. */
 export const incidentGuide = (page: Page) => page.getByRole('region', { name: 'Incident guide' });

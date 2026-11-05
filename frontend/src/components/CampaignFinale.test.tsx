@@ -123,6 +123,24 @@ it("withdraws the warning once a later save succeeds, so the next switch saves t
   expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
 });
 
+it("says once that a finished company cannot be saved: the warning replaces the save's toasts but not other notes", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
+  expect(useGame.getState().toast).toBeNull();
+  // The ten-second autosave fails too, and says nothing the warning does not.
+  update(() => { useGame.getState().saveNow(true); });
+  expect(useGame.getState().toast).toBeNull();
+  update(() => useGame.getState().notify("Something else", "info"));
+  expect(useGame.getState().toast?.text).toBe("Something else");
+  // Without the warning, a failed save is told again.
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));
+  expect(scorecard()).toBeNull();
+  update(() => { useGame.getState().saveNow(true); });
+  expect(useGame.getState().toast).toMatchObject({ kind: "error", unsaved: true });
+});
+
 it("keeps Continue to Challenge Mode on a won run's scorecard reopened from the final company, opening on Close", () => {
   show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));
@@ -164,6 +182,8 @@ it("drops the warning when a cloud action refuses the switch instead of the save
   useGame.setState({ cloudBusy: true });
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
   expect(scorecard()!.textContent).not.toContain("could not be saved");
+  // Its reason is the toast's alone.
+  expect(useGame.getState().toast?.text).toBe("Wait for the cloud operation before replacing this company.");
   // Once the cloud action is over, the switch tries to save again rather than discarding the company unasked.
   useGame.setState({ cloudBusy: false }); setItem.mockRestore();
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
