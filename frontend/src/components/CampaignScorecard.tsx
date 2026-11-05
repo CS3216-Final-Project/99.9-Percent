@@ -15,7 +15,9 @@ function ScorecardEvidence({card}:{card:Scorecard}) {
  <p>Service health means latency below 500 ms, service errors below 1%, positive admissions and completed outcomes. Rejected traffic is a separate business trade-off. This is a game-specific uptime measure.</p>
  <h3>Final architecture</h3><ul>{card.architecture.apps.map(a=><li key={a.id}>{a.id}: {a.capacity} req/s, {a.health}, {a.role}, {a.routed?"configured for traffic":"unrouted"}</li>)}</ul>
  <p>Database {card.architecture.dbCapacity} ops/s; routing {card.architecture.routing.mode}: {card.architecture.routing.targets.join(", ")}. Load balancer {card.architecture.loadBalancer?"deployed":"absent"}; cache {card.architecture.readCache?`${card.architecture.readCache.warmth/100}% warm` :"absent"}.</p>
- <p>Owned technologies: {card.ownedTechIds.join(", ")||"None"}. Deployed technologies: {card.deployedTechIds.join(", ")||"None"}.</p><p>Run <code>{card.runId}</code>; seed <code>{card.seed}</code>; captured at physical step {card.capturedStep}.</p></section>;
+ <p>Owned technologies: {card.ownedTechIds.join(", ")||"None"}. Deployed technologies: {card.deployedTechIds.join(", ")||"None"}.</p>
+ {/* Each ID sits in its own row, so a chip never has punctuation pressed against it and a drag across both copies them apart. */}
+ <dl><dt>Run ID</dt><dd><code>{card.runId}</code></dd><dt>Seed</dt><dd><code>{card.seed}</code></dd><dt>Captured at</dt><dd>Physical step {card.capturedStep}</dd></dl></section>;
 }
 
 export default function CampaignScorecard({card}:{card:Scorecard}) {

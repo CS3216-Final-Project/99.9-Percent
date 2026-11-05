@@ -147,6 +147,13 @@ code {
   -webkit-touch-callout: default;
 }
 
+/* An ID is copied whole: one click, double-click or long press on its chip selects exactly the chip's value, never
+   one hyphen-separated part of it or the chip beside it. */
+code {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
 /* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. The chip
    moves to the next line whole rather than splitting an ID, and breaks only an ID wider than the line. Its line
    height keeps a line holding a chip as tall as the lines around it. */

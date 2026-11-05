@@ -1,4 +1,5 @@
-import { test, expect, seedSave, savedGame, expectRoom } from "./fixtures";
+import type { Locator, Page } from "@playwright/test";
+import { test, expect, seedSave, savedGame, expectRoom, chooseAppProfile } from "./fixtures";
 import { reliabilityClarity } from "./reliabilityClarity";
 import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 import { newGame, replayCampaign } from "../src/sim";
@@ -78,6 +79,62 @@ test("the playtest session ID stays selectable for a facilitator's bug report", 
   await page.mouse.move(box!.x + box!.width - 1, box!.y + box!.height / 2, { steps: 2 }); await page.mouse.up();
   expect(await page.evaluate(() => getSelection()?.toString())).toBe(id);
   await notes.screenshot({ path: info.outputPath("session-id.png") });
+  // One double-click takes the whole ID, not one hyphen-separated part of it.
+  await expectSelects(page, notes.locator("code").first(), id, "dblclick");
+  // What the facilitator types still selects word by word.
+  const typed = menu.getByRole("textbox", { name: "Exact facilitator intervention" });
+  await typed.fill("paused the run"); await typed.dblclick({ position: { x: 8, y: 10 } });
+  expect(await typed.evaluate(el => { const t = el as HTMLTextAreaElement; return t.value.slice(t.selectionStart, t.selectionEnd); })).toBe("paused");
+});
+
+/** Selects a code chip as a player would and expects exactly its value. */
+async function expectSelects(page: Page, chip: Locator, value: string, gesture: "click" | "dblclick" | "triple") {
+  await chip.scrollIntoViewIfNeeded();
+  await page.evaluate(() => getSelection()?.removeAllRanges());
+  const box = (await chip.boundingBox())!, x = box.x + box.width / 2, y = box.y + box.height / 2;
+  if (gesture === "triple") await page.mouse.click(x, y, { clickCount: 3 }); else if (gesture === "dblclick") await page.mouse.dblclick(x, y); else await page.mouse.click(x, y);
+  expect(await page.evaluate(() => getSelection()?.toString()), `${gesture} on ${value}`).toBe(value);
+}
+
+test("a code chip copies whole: a click takes the full run ID or seed, and the two never run together", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  // Real run IDs are UUIDs, whose hyphens split a double-clicked word.
+  const runId = "3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b", game = reliabilityOutcome(true); game.campaign!.runId = runId;
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("dialog", { name: "Reliability outcome", exact: true }).getByRole("button", { name: "Complete campaign", exact: true }).click();
+  const scorecard = page.getByRole("dialog", { name: "Campaign complete", exact: true }).getByRole("region", { name: "Run scorecard" });
+  await scorecard.getByText("View Technical Details", { exact: true }).click();
+  const card = (await savedGame(page)).campaign!.scorecard!, seed = String(card.seed);
+  expect(card.runId).toBe(runId);
+  const run = scorecard.locator("code", { hasText: runId }), seedChip = scorecard.locator("code", { hasText: new RegExp(`^${seed}$`) });
+  for (const gesture of ["click", "dblclick", "triple"] as const) {
+    await expectSelects(page, run, runId, gesture);
+    await expectSelects(page, seedChip, seed, gesture);
+  }
+  // A drag from the run ID across the seed copies both, each on its own line.
+  const from = (await run.boundingBox())!, to = (await seedChip.boundingBox())!;
+  await page.evaluate(() => getSelection()?.removeAllRanges());
+  await page.mouse.move(from.x + 2, from.y + from.height / 2); await page.mouse.down();
+  await page.mouse.move(to.x + to.width - 2, to.y + to.height / 2, { steps: 4 }); await page.mouse.up();
+  const dragged = await page.evaluate(() => getSelection()?.toString() ?? "");
+  expect(dragged.split(/\s+/).filter(Boolean)).toEqual([runId, seed]);
+  await run.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("scorecard-ids.png") });
+});
+
+test("Challenge Mode's menu seed copies whole on a click", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, newGame(1, "seed-copy"), { challengeUnlocked: true }); await page.goto("/");
+  await page.getByRole("button", { name: "Start Challenge Mode", exact: true }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await chooseAppProfile(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const seed = page.getByRole("dialog", { name: "Menu", exact: true }).locator(".menu-seed code");
+  const value = (await seed.textContent())!;
+  expect(value).toMatch(/^\d+$/);
+  for (const gesture of ["click", "dblclick", "triple"] as const) await expectSelects(page, seed, value, gesture);
 });
 
 test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock, withoutRoom }, info) => {
