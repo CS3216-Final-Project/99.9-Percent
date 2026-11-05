@@ -97,6 +97,8 @@ test("Stay Online guide unlocks Health Checks in Tech as one box and confirms it
   await expect(guide(6)).toContainText("Press Deploy Health Checks.");
   await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();
   await expect(guide(7)).toContainText("Press Confirm.");await boxes(6);
+  // Each click's box and instruction are announced politely while focus stays in Monitoring's inspection.
+  await expect(page.getByRole("status").filter({hasText:/^Chapter guide, step/})).toHaveText("Chapter guide, step 7 of 7: Press Confirm.");
   // Opened from Monitoring's details as they fade in, the preview is still centred on the screen, not on the details.
   const preview=(await page.locator(".component-purchase").boundingBox())!,screen=page.viewportSize()!;
   expect(Math.abs(preview.x+preview.width/2-screen.width/2)).toBeLessThan(1);expect(Math.abs(preview.y+preview.height/2-screen.height/2)).toBeLessThan(1);
