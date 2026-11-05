@@ -161,6 +161,7 @@ Taylor's line counts the recorded incidents, and the last line shows uptime (whe
 Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
 The scorecard ends on Inspect final company, Export or start a new company, and Continue to Challenge Mode, which saves the finished company and switches to Challenge Mode, now unlocked.
 When the company cannot be saved, Continue to Challenge Mode first warns that switching loses it and switches only when pressed again.
+View run scorecard, in the final company's panel or the Menu, reopens the scorecard with the same three actions.
 
 The final scorecard separates settled and pending revenue, setup and operating costs, and salaries.
 It reports rejected demand separately from service errors, plus architecture, technologies, incident count, service-health uptime and the longest degraded span.

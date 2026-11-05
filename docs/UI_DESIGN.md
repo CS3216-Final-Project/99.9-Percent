@@ -192,6 +192,8 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Its technical details show that table instead, scrolling sideways inside the disclosure on narrow screens, with each server's demand and capacity (a failed server's capacity as 0, marked failed) and the route, and then the recorded events as a "What happened, second by second" list.
   The chapter is the one the company was playing when the incident opened, the same rule that picks the report's colleague, so an Opening incident read in Stay Online keeps its timeline.
   Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.
+  Guided Mode's final scorecard opens after the finale focused on Continue to Challenge Mode.
+  View run scorecard reopens a won run's scorecard as Company scorecard with the same three actions, where Inspect final company returns to the company as Close does, and it opens focused on Close because the player opened it to read.
   On phones its actions form an even grid, two columns with the primary action last (one column on the narrowest phones), and its five ratings share their row, so nothing wraps raggedly or runs past the card; cash of a million or more is rounded like the top bar's, and so are users from ten million.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).
   In Challenge Mode they sit below the top bar.

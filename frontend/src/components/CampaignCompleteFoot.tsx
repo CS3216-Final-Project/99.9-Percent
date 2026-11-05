@@ -6,8 +6,9 @@ import { useModeSwitch } from "./useModeSwitch";
 /**
  * How a won Guided Mode ends: inspect the final company, export or start over, or carry on into Challenge Mode, which
  * finishing Stay Online has unlocked. The company is saved first; when it cannot be, switching asks before losing it.
+ * `focus` opens the dialog on Continue to Challenge Mode, as the finale does; a scorecard reopened to be read does not.
  */
-export function CampaignCompleteFoot() {
+export function CampaignCompleteFoot({ focus = true }: { focus?: boolean }) {
   const openView = useGame(s => s.openView);
   const { unsaved, switchTo } = useModeSwitch();
   const losing = unsaved === "classic";
@@ -17,7 +18,7 @@ export function CampaignCompleteFoot() {
       <button className="btn" onClick={() => openView("guidance")}><Icon name="eyes" size={16} />Inspect final company</button>
       <button className="btn" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button>
       {/* The scorecard opens on this button, so Enter still held from the finale or the home screen must not press it. */}
-      <button className={`btn ${losing ? "btn-danger" : "btn-primary"}`} data-autofocus onKeyDown={e => { if (e.repeat) e.preventDefault(); }} onClick={e => switchTo("classic", e.currentTarget)}>
+      <button className={`btn ${losing ? "btn-danger" : "btn-primary"}`} data-autofocus={focus || undefined} onKeyDown={e => { if (e.repeat) e.preventDefault(); }} onClick={e => switchTo("classic", e.currentTarget)}>
         {losing ? "Switch and lose this company" : "Continue to Challenge Mode"}<Icon name="next" />
       </button>
     </div>

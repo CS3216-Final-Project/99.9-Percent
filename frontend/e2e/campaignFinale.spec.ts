@@ -85,6 +85,30 @@ test("campaign finale: Enter held on its last line opens the scorecard without l
   await expect.poll(() => page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
 });
 
+test("campaign complete: the scorecard reopened from the final company still continues to Challenge Mode", async ({ page, withoutRoom }, info) => {
+  await withoutRoom();
+  const { scene, scorecard } = await openFinale(page);
+  await scene.getByRole("button", { name: "Skip to the scorecard", exact: true }).click();
+  await scorecard.getByRole("button", { name: "Inspect final company", exact: true }).click();
+  await expect(scorecard).toHaveCount(0);
+  const view = page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "View run scorecard", exact: true });
+  const reopened = page.getByRole("dialog", { name: "Company scorecard", exact: true });
+  await view.click();
+  // Reopened to be read, it opens on Close rather than on the way into Challenge Mode.
+  await expect(reopened.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+  // Inspect final company goes back to the inspection the scorecard was opened from.
+  await reopened.getByRole("button", { name: "Inspect final company", exact: true }).click();
+  await expect(reopened).toHaveCount(0); await expect(view).toBeVisible();
+  await view.click();
+  const challenge = reopened.getByRole("button", { name: "Continue to Challenge Mode", exact: true });
+  await challenge.scrollIntoViewIfNeeded(); await expect(challenge).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: info.outputPath("company-scorecard-reopened.png") });
+  await challenge.click();
+  await expect(reopened).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
+  expect((await savedGame(page)).outcome).toBe("won");
+});
+
 /** WCAG contrast of an element's text on its own background, both opaque. */
 const contrast = (target: Locator) => target.evaluate(el => {
   const luminance = (rgb: string) => {

@@ -551,7 +551,8 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   // A finished chapter's recognition doubles as its completion menu: Stay or Continue. Judging what the next chapter
   // waits for copies the company, so it is worked out once per game state rather than on every store update.
   const end = useMemo(() => chapterEnd(game, scope), [game, scope]);
-  if(view==="scorecard"&&c.scorecard)return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard}/></Modal>;
+  // A won run's scorecard keeps the finale's ways on, Challenge Mode included; reopened to be read, it opens on Close.
+  if(view==="scorecard"&&c.scorecard)return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard}/>{game.outcome==="won"&&<CampaignCompleteFoot focus={false}/>}</Modal>;
   if (pendingReliability(c) && end) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }} onClose={stay}>
     <ReliabilityOutcome campaign={c} />
     <ChapterEndFoot end={end} />

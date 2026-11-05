@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act as update, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newGame } from "@/sim";
 import { act, completedReliability } from "@/sim/__tests__/completionFixture";
@@ -100,6 +100,29 @@ it("asks before losing a finished company that cannot be saved, then switches wh
   expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
   expect(useGame.getState().mode).toBe("classic");
+});
+
+it("keeps Continue to Challenge Mode on a won run's scorecard reopened from the final company, opening on Close", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));
+  update(() => useGame.getState().openView("scorecard"));
+  const reopened = screen.getByRole("dialog", { name: "Company scorecard" });
+  expect(document.activeElement).toBe(within(reopened).getByRole("button", { name: "Close" }));
+  // Inspect final company returns to the company, as Close does.
+  fireEvent.click(within(reopened).getByRole("button", { name: "Inspect final company" }));
+  expect(useGame.getState().view).toBe("guidance");
+  update(() => useGame.getState().openView("scorecard"));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Company scorecard" })).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("offers no Challenge Mode from a bankrupt company's scorecard", () => {
+  const bankrupt = structuredClone(won); bankrupt.outcome = "bankrupt"; bankrupt.campaign!.scorecard!.outcome = "bankrupt";
+  show(bankrupt); update(() => useGame.getState().openView("scorecard"));
+  const card = screen.getByRole("dialog", { name: "Company scorecard" });
+  expect(within(card).queryByRole("button", { name: "Continue to Challenge Mode" })).toBeNull();
+  expect(within(card).queryByRole("button", { name: "Inspect final company" })).toBeNull();
 });
 
 it("does not switch on a held Enter that carried on from the finale", () => {
