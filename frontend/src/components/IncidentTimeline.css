@@ -48,3 +48,28 @@
    the event's first line. */
 .incident-timeline .report-event-step { display: flex; align-self: start; align-items: baseline; justify-content: space-between; gap: 6px; }
 .timeline-badge { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; color: var(--paper); font-size: 9px; line-height: 1; align-self: center; }
+
+/* Forced colours repaint the page's text and boxes in the system's colours but leave the drawing's own, so its words and
+   guides take the system's text colour and the selected second its highlight. The series keep their colours, as their
+   lines do, wherever a colour is what tells them apart: the key's swatches and the events' badges. */
+@media (forced-colors: active) {
+  .timeline-lane, .timeline-incident-label, .timeline-limit-label, .incident-timeline .chart-tick { fill: CanvasText; }
+  .timeline-limit, .timeline-activation, .timeline-axis { stroke: CanvasText; opacity: 1; }
+  .incident-timeline .chart-grid { stroke: GrayText; opacity: .6; }
+  .timeline-incident { fill: Highlight; opacity: .14; }
+  .timeline-cursor { stroke: Highlight; stroke-width: 2; opacity: 1; }
+  .timeline-dot { stroke: Canvas; }
+  /* Requests before the traffic limit are drawn in no series' colour, so their line and swatch take the text colour. */
+  .timeline-line.is-dotted { stroke: CanvasText; }
+  .timeline-legend i:not(.is-dotted) { forced-color-adjust: none; }
+  .timeline-marker circle { stroke: CanvasText; stroke-width: 1; }
+  .timeline-marker[data-current] circle { stroke: Highlight; stroke-width: 2.5; }
+  .timeline-marker.is-folded circle { fill: Canvas; stroke: CanvasText; }
+  .timeline-marker.is-folded text { fill: CanvasText; }
+  .timeline-marker.is-folded[data-current] circle { fill: Canvas; stroke: Highlight; }
+  /* The ring is left to forced colours, which draw it in the system's text colour round any kind's fill. */
+  .timeline-badge { position: relative; forced-color-adjust: none; }
+  .timeline-badge::after { content: ""; position: absolute; inset: -1px; border: 1px solid; border-radius: inherit; forced-color-adjust: auto; }
+  /* Forced colours clear the selection's fill, so the selected second's events are ringed instead. */
+  .incident-timeline .report-events li[data-current] { outline: 2px solid CanvasText; outline-offset: -2px; }
+}

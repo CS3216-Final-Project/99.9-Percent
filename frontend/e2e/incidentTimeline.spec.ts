@@ -203,6 +203,78 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 640]]) for (const 
   });
 }
 
+/** WCAG contrast between two computed rgb() colours. */
+function contrast(a: string, b: string) {
+  const lum = (c: string) => {
+    const [r, g, bl] = c.match(/[\d.]+/g)!.slice(0, 3).map(v => { const s = +v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+for (const scheme of ["dark", "light"] as const) test(`the incident timeline stays readable in ${scheme} forced colours`, async ({ page, withoutRoom }, info) => {
+  await withoutRoom();
+  // As a player's system setting, forced colours are on before the page loads: Chromium does not fully repaint a drawing
+  // when they are turned on under it.
+  await page.emulateMedia({ forcedColors: "active", colorScheme: scheme });
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, slowResponse()); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
+  const slider = await openTimeline(page, report);
+  await slider.focus();
+  await page.keyboard.press("Home");
+  const seen = await report.locator(".incident-timeline").evaluate(root => {
+    // Chromium paints a forced-colours page's elements as their attributes change but can report the computed colours
+    // they had before, so each colour is read from a fresh copy of its element, beside it.
+    const fresh = <T,>(el: Element, read: (copy: Element) => T) => { const copy = el.cloneNode(true) as Element; el.after(copy); const value = read(copy); copy.remove(); return value; };
+    const all = <T,>(selector: string, read: (copy: Element) => T) => [...root.querySelectorAll(selector)].map(el => fresh(el, read));
+    const fill = (copy: Element) => getComputedStyle(copy).fill, stroke = (copy: Element) => getComputedStyle(copy).stroke;
+    const ring = (copy: Element) => getComputedStyle(copy.querySelector("circle")!).stroke;
+    // The system's colours as forced colours resolve them in the drawing, which they do not repaint.
+    const names = ["Canvas", "CanvasText", "Highlight"], sheet = document.createElement("style"), probe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    sheet.textContent = names.map(name => `[data-probe="${name}"] { fill: ${name}; }`).join("\n");
+    document.head.append(sheet); root.querySelector("svg")!.append(probe);
+    const [canvas, text, highlight] = names.map(name => { probe.setAttribute("data-probe", name); return fresh(probe, fill); });
+    probe.remove(); sheet.remove();
+    const swatch = (name: string) => fresh([...root.querySelectorAll(".timeline-legend li")].find(li => li.textContent === name)!.querySelector("i")!, copy => getComputedStyle(copy).borderTopColor);
+    return {
+      colors: { canvas, text, highlight },
+      lanes: all(".timeline-lane", fill), ticks: all(".chart-tick", fill), limits: all(".timeline-limit-label", fill), incidentLabel: all(".timeline-incident-label", fill),
+      cursor: all(".timeline-cursor", stroke),
+      swatches: { app: swatch("App Servers demand"), appCapacity: swatch("App Servers capacity"), db: swatch("Database demand"), dbCapacity: swatch("Database capacity") },
+      lines: all(".timeline-line", stroke),
+      badges: all(".timeline-badge", copy => { const s = getComputedStyle(copy), after = getComputedStyle(copy, "::after"); return { text: copy.textContent!, background: s.backgroundColor, color: s.color, ring: `${after.borderTopStyle} ${after.borderTopColor}` }; }),
+      markerRings: all(".timeline-marker:not([data-current])", ring), selectedMarkerRings: all(".timeline-marker[data-current]", ring),
+      selectedKey: all(".report-events li[data-current]", copy => { const s = getComputedStyle(copy); return `${s.outlineStyle} ${s.outlineColor}`; }),
+    };
+  });
+  const { text, highlight } = seen.colors;
+  // Every word drawn in the plot is in the system's text colour, so none is lost on the system's background.
+  for (const fill of [...seen.lanes, ...seen.ticks, ...seen.limits, ...seen.incidentLabel]) expect(fill).toBe(text);
+  // The selected second's line and markers stand out in the system's highlight, and its events in the key are ringed.
+  expect(seen.cursor).toEqual([highlight]);
+  expect(seen.selectedMarkerRings.length).toBeGreaterThan(0);
+  for (const ring of seen.selectedMarkerRings) expect(ring).toBe(highlight);
+  for (const ring of seen.markerRings) expect(ring).toBe(text);
+  expect(seen.selectedKey.length).toBeGreaterThan(0);
+  for (const key of seen.selectedKey) expect(key).toBe(`solid ${text}`);
+  // The key's swatches keep the colours of the lines they name, so App Servers and Database still tell apart.
+  expect(seen.swatches.app).not.toBe(seen.swatches.db);
+  expect(seen.swatches.app).toBe(seen.swatches.appCapacity);
+  expect(seen.swatches.db).toBe(seen.swatches.dbCapacity);
+  expect(seen.lines).toContain(seen.swatches.app);
+  expect(seen.lines).toContain(seen.swatches.db);
+  // Each event's badge keeps its kind's colour, ringed in the text colour, with its number readable on it.
+  expect(seen.badges.length).toBeGreaterThan(0);
+  for (const badge of seen.badges) {
+    expect(badge.background, badge.text).not.toBe(seen.colors.canvas);
+    expect(badge.ring, badge.text).toBe(`solid ${text}`);
+    expect(contrast(badge.color, badge.background), badge.text).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.screenshot({ path: info.outputPath(`forced-${scheme}.png`) });
+});
+
 // On a desktop the closed details lay the plot out narrower than it opens; on a phone the widths match.
 test("the first frame after the technical details open is drawn at the plot's width", async ({ page, withoutRoom }) => {
   await withoutRoom();
