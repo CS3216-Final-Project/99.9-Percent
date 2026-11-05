@@ -97,6 +97,7 @@ Apply this system to both modes and every surface: title and account, HUD and ch
 | Keyboard focus | Visible blue 3 px outline with an offset; do not replace it with a shadow or remove it on dark surfaces. |
 | Disabled / unavailable | Readable muted text, no movement, and the existing explanation of the requirement or cost. |
 | Loading / result | Reserve the control footprint across every label, count and icon change. |
+| Text selection | Game text is not selectable, so clicks, drags and long presses never highlight it. What the player types stays selectable, and so does a seed or run ID, always set in a small `code` chip: an inset fill on paper, a night fill on the night menu card. |
 
 Use `--control-edge`, `--control-inset`, `--control-hover`, `--control-active`, `--selection`, `--selection-edge`, `--primary-hover`, `--primary-active`, `--danger-hover` and `--danger-active` from `index.css`. `--press` is `none`; `--lift` is a diffuse overlay shadow. Do not add a local palette to solve an individual component. Keep layout transforms, room animations, focus indicators and equipment-targeting rings independent from button decoration.
 

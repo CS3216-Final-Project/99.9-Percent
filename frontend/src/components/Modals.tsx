@@ -227,7 +227,9 @@ export function EndReport() {
           </div>
           <div className="row">
             <dt>Seed</dt>
-            <dd>{r.seed}</dd>
+            <dd>
+              <code>{r.seed}</code>
+            </dd>
           </div>
         </dl>
         <RunCharts game={game} compactSet />

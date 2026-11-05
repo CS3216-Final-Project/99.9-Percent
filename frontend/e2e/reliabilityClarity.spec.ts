@@ -31,6 +31,21 @@ test("game text is not selectable: dragging across a report highlights nothing",
   expect(await drag()).toBe("");
   await page.screenshot({ path: info.outputPath("selection-blocked.png") });
   await expect(outcome).toBeVisible();
+  // The run ID and seed are what a player copies into a bug report, so the scorecard keeps them selectable.
+  await outcome.getByRole("button", { name: "Complete campaign", exact: true }).click();
+  const scorecard = page.getByRole("dialog", { name: "Campaign complete", exact: true }).getByRole("region", { name: "Run scorecard" });
+  await scorecard.getByText("View Technical Details", { exact: true }).click();
+  const { runId, seed } = (await savedGame(page)).campaign!.scorecard!;
+  for (const id of [runId, String(seed)]) {
+    const value = scorecard.getByText(id, { exact: true });
+    await value.scrollIntoViewIfNeeded();
+    const box = (await value.boundingBox())!;
+    await page.evaluate(() => getSelection()?.removeAllRanges());
+    await page.mouse.move(box.x + 1, box.y + box.height / 2); await page.mouse.down();
+    await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, { steps: 2 }); await page.mouse.up();
+    expect(await page.evaluate(() => getSelection()?.toString())).toBe(id);
+  }
+  await page.screenshot({ path: info.outputPath("selection-seed.png") });
 });
 
 test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock, withoutRoom }, info) => {

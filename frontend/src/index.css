@@ -129,7 +129,8 @@ body {
 }
 
 /* The game reads as an app rather than a page: clicking, dragging and long-pressing through panels, dialogues and
-   the room never highlight their text. What a player types, and a seed they may want to copy, stay selectable. */
+   the room never highlight their text. What a player types, and a seed or run ID they may want to copy (always in
+   code), stay selectable. */
 body {
   overflow: hidden;
   -webkit-user-select: none;
@@ -144,6 +145,14 @@ code {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;
+}
+
+/* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. */
+code {
+  padding: 1px 6px;
+  font-weight: 600;
+  background: var(--control-inset);
+  border-radius: 3px;
 }
 
 h1,
@@ -4008,12 +4017,8 @@ button:disabled {
 
 .menu-seed code {
   margin: 0 4px;
-  padding: 1px 6px;
-  font-family: var(--font-num);
-  font-weight: 600;
   color: var(--on-night);
   background: var(--night-3);
-  border-radius: 3px;
 }
 
 .menu-resume {
