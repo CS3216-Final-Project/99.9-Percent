@@ -311,7 +311,7 @@
   background: var(--control-hover);
 }
 .btn.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-.btn.btn-danger:hover:not(:disabled) { background: #d9364b; }
+.btn.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
 .act:active:not(:disabled), .action:active:not(:disabled), .chip:active:not(:disabled),
 .icon-btn:active:not(:disabled), .node:active { background: var(--control-active); }
 .act-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
@@ -362,7 +362,7 @@
 .btn:active:not(:disabled), .act:active:not(:disabled), .action:active:not(:disabled),
 .chip:active:not(:disabled), .icon-btn:active:not(:disabled), .node:active { background: var(--control-active); }
 .btn.btn-primary:active:not(:disabled), .act-primary:active:not(:disabled) { background: var(--primary-active); }
-.btn.btn-danger:active:not(:disabled) { background: var(--critical-ink); }
+.btn.btn-danger:active:not(:disabled) { background: var(--danger-active); }
 .topbar .icon-btn:active:not(:disabled), .account-chip:active { background: var(--night); }
 .node.is-selected { outline: 2px solid var(--selection-edge); outline-offset: 2px; }
 .node:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

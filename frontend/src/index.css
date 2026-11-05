@@ -47,6 +47,9 @@
   --warn-ink: #a65400;
   --critical: #ff4d5e;
   --critical-ink: #c41d33;
+  /* Destructive buttons: white text keeps at least 4.5:1 at rest, hovered and pressed. */
+  --danger-hover: #d02a40;
+  --danger-active: #a3172a;
   /* Critical text on the caption's dark band. */
   --critical-caption: #ffb4bb;
 
@@ -1752,12 +1755,12 @@ button:disabled {
 }
 
 .btn-danger {
-  background: var(--critical);
+  background: var(--critical-ink);
   color: #fff;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #ff6b79;
+  background: var(--danger-hover);
 }
 
 .btn-quiet {
