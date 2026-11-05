@@ -225,14 +225,19 @@ function closedDockMenu(el: Element): { summary: HTMLElement; name: string } | n
 
 /**
  * VoiceOver ignores a live region outside an open aria-modal dialog, such as the inspection a step's control lives
- * in, so each open one is given the region to own before it speaks (as Angular CDK's LiveAnnouncer does). The region
- * stays where it is in the page, so it is never re-created with its message already in it.
+ * in, so the open one is given the region to own before it speaks (as Angular CDK's LiveAnnouncer does). The region
+ * stays where it is in the page, so it is never re-created with its message already in it. An element has one owner,
+ * so where dialogs are nested, such as a purchase preview inside its inspection, only the innermost owns it.
  */
 function ownFromModals(id: string) {
-  for (const modal of document.querySelectorAll('[aria-modal="true"]')) {
+  const modals = [...document.querySelectorAll('[aria-modal="true"]')];
+  modals.forEach((modal, i) => {
     const owns = modal.getAttribute("aria-owns")?.split(/\s+/).filter(Boolean) ?? [];
-    if (!owns.includes(id)) modal.setAttribute("aria-owns", [...owns, id].join(" "));
-  }
+    const others = owns.filter(o => o !== id), next = i === modals.length - 1 ? [...others, id] : others;
+    if (next.join(" ") === owns.join(" ")) return;
+    if (next.length) modal.setAttribute("aria-owns", next.join(" "));
+    else modal.removeAttribute("aria-owns");
+  });
 }
 
 export default function Tutorial() {

@@ -169,6 +169,11 @@ it("announces each click's box and instruction within a Stay Online step, but no
   await vi.waitFor(() => expect(heard("Chapter guide")).toEqual(["Chapter guide, step 6 of 7: Press Deploy Health Checks."]));
   fireEvent.click(within(monitoring).getByRole("button", { name: /^Deploy Health Checks/ }));
   expect(heard("Chapter guide")).toEqual(["Chapter guide, step 7 of 7: Press Confirm."]);
+  // An element has one owner: the purchase preview inside the inspection takes the region over from it.
+  const preview = screen.getByRole("dialog", { name: "Purchase preview" });
+  expect(monitoring.contains(preview)).toBe(true);
+  expect((preview.getAttribute("aria-owns") ?? "").split(" ")).toContain(region.id);
+  expect((monitoring.getAttribute("aria-owns") ?? "").split(" ")).not.toContain(region.id);
   // The announcement is not part of the card, so focusing the card never reads it a second time.
   expect(guide(7).querySelector('[role="status"], [aria-live]')).toBeNull();
 });
