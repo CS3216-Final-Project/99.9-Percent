@@ -23,8 +23,9 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await expect(finance.getByText("Last period's result does not include purchases.")).toBeVisible();
     await page.screenshot({path:"test-results/finance-desktop.png"});
     await finance.getByText("How estimates work",{exact:true}).click();
-    await finance.getByText(/This is a budget estimate, not a bankruptcy deadline/).scrollIntoViewIfNeeded();
-    await expect(finance.getByText(/This is a budget estimate, not a bankruptcy deadline/)).toBeInViewport();
+    // The section slides open, so a scroll made while it grows can leave the text below the fold; scroll until it is seen.
+    const estimate=finance.getByText(/This is a budget estimate, not a bankruptcy deadline/);
+    await expect(async()=>{await estimate.scrollIntoViewIfNeeded();await expect(estimate).toBeInViewport({timeout:500});}).toPass();
     await page.keyboard.press("Escape");await expect(page.getByRole("button",{name:"View finances"})).toBeFocused();
     expect((await savedGame(page)).campaign).toEqual(before.campaign);
     const add=await infrastructureAction(page,/Add server/),beforePurchase=await savedGame(page);await add.click();

@@ -61,6 +61,8 @@ async function openTimeline(page: Page, scope: Locator) {
   await scope.getByText("View Technical Details", { exact: true }).click();
   const slider = scope.getByRole("slider", { name: "Incident timeline, game second", exact: true });
   await expect(slider).toBeVisible();
+  // It joins the tab order on the disclosure's toggle event, a task after it opens; focused before then, it is not.
+  await expect(slider).toHaveAttribute("tabindex", "0");
   return slider;
 }
 
@@ -163,6 +165,7 @@ for (const [width, height] of [[1440, 900], [320, 640]]) test(`a burst of events
  */
 async function plotPositions(page: Page, slider: Locator) {
   await slider.focus();
+  await expect(slider).toBeFocused();
   await page.keyboard.press("Home");
   // Each move is measured as soon as it is drawn into the page: the slider's value changes in the same commit as the
   // readout, and reading the plot's box then lays the page out as it will be painted.
