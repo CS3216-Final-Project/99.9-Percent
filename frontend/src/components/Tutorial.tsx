@@ -157,7 +157,6 @@ const CHAPTERS = {
       why: "This chapter's capabilities are unlocked in Tech with research points.",
       hint: (s) => ["Open Tech.", "Click Health Checks.", "Press Unlock Health Checks."][unlockClick(s)],
       target: (s) => [TECH_TAB, '.node[data-tech="health_checks"]', `.tree-detail ${PRIMARY}`][unlockClick(s)],
-      clicks: { count: 3, at: unlockClick },
       inTech: true,
       done: (s) => !!s.game.campaign?.reliabilityStage?.owned.includes("health_checks"),
     },
