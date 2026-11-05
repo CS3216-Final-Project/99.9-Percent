@@ -102,6 +102,27 @@ it("asks before losing a finished company that cannot be saved, then switches wh
   expect(useGame.getState().mode).toBe("classic");
 });
 
+it("withdraws the warning once a later save succeeds, so the next switch saves the company first", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
+  // Storage recovers and the next autosave keeps the company, so it is no longer at risk.
+  setItem.mockRestore();
+  update(() => { useGame.getState().saveNow(true); });
+  expect(within(scorecard()!).queryByRole("alert")).toBeNull();
+  expect(within(scorecard()!).queryByRole("button", { name: "Switch and lose this company" })).toBeNull();
+  // A failed autosave on its own asks nothing: only a pressed switch does.
+  const failing = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  update(() => { useGame.getState().saveNow(true); });
+  expect(within(scorecard()!).queryByRole("alert")).toBeNull();
+  // The switch saves again rather than discarding the company unasked.
+  failing.mockRestore(); localStorage.removeItem("nn.campaign.save.v1");
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
 it("keeps Continue to Challenge Mode on a won run's scorecard reopened from the final company, opening on Close", () => {
   show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));

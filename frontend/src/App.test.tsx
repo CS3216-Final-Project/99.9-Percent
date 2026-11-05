@@ -54,6 +54,25 @@ it("keeps the mode choice open when switching cannot preserve the stored save", 
   expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
 });
 
+it("withdraws the menu's lose-this-run warning once Save now succeeds, and then saves before switching", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  const menu = openMenu();
+  const modes = within(menu).getByRole("region", { name: "Game mode" });
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
+  expect(within(modes).getByRole("alert").textContent).toContain("This run could not be saved");
+  // Storage recovers and the player saves from the same menu: the run is safe again.
+  setItem.mockRestore();
+  fireEvent.click(within(menu).getByRole("button", { name: /Save now/ }));
+  expect(useGame.getState().saveStatus).toBe("saved");
+  expect(within(modes).queryByRole("alert")).toBeNull();
+  localStorage.removeItem("nn.campaign.save.v1");
+  fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(localStorage.getItem("nn.campaign.save.v1")).not.toBeNull();
+});
+
 it("shows the locked unlock prompt in the menu instead of a switch control", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const menu = openMenu();

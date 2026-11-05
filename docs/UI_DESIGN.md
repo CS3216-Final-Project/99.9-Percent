@@ -145,6 +145,8 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Until Chapter 5, Stay Online, is complete, Challenge Mode is not a card: the Guided Mode card stands alone and a short teaser below it, with no controls, names the goal (“Grow to 50,000 users in 26 weeks on your own.”), says “Unlocks after Chapter 5: Stay Online.”, adds the player's current chapter once there is one, and shows five chapter pips, the last of which is the goal.
   The mode played last gets a yellow “Last played” tag, and on devices with a fine pointer keyboard focus starts on its button.
   Choosing the other mode switches to it at once and keeps the first mode's save; when the current run cannot be saved, the button turns red as “Switch and lose this run” with a warning inside that card, which points to Menu, Saves for export where the edition has it.
+  The same warning and red button (“Switch and lose this company” on the final scorecard) last only while the run is unsaved: once a later save succeeds, an autosave or Save now, they are withdrawn and the next press saves the run before switching.
+  A failed autosave never raises the warning by itself; only a pressed switch does.
   No run starts before a choice.
   Anonymous analytics is on by default.
   Until the player answers, a one-line notice (“Anonymous gameplay stats help improve 99.99%.”) sits below the cards with a Details toggle that reveals what is tracked and that nothing is sent while the browser's Do Not Track or Global Privacy Control setting is on, plus equal OK and Opt out buttons; either choice is remembered and the notice does not return.
