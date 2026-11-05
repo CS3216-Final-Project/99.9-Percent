@@ -7,8 +7,9 @@
 /* A report reads as a chat: the colleague of the report's chapter asks each question from the right, and the player,
    who ran the company through it, answers from the left. The summary after the first answer (capacity after a failure)
    joins the conversation, its heading as a question and its readings and story as answers. A small picture of the
-   speaker sits beside each bubble. */
-.campaign-incident-report { --report-face: 30px; --report-side: calc(var(--report-face) + 8px); }
+   speaker sits beside each bubble, in a gutter kept only when the report has speakers. */
+.campaign-incident-report { --report-face: 30px; --report-side: 0px; }
+.campaign-incident-report[data-speaker] { --report-side: calc(var(--report-face) + 8px); }
 :is(.campaign-incident-report, .report-lesson-summary) > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
 .report-lesson-summary { display: contents; }
 :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
