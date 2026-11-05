@@ -128,8 +128,7 @@ function PinnedRecovery({ campaign: c }: { campaign: Campaign }) {
 function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const fault = currentFault(c);
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
-  return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
-    <RecoveryCount campaign={c} />
+  const conditions = <>
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
@@ -138,6 +137,10 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
       {failedAppActive && <li><Icon name="server" size={16} /><span>Failed server restored, or removed from traffic with an empty queue</span></li>}
       {c.incident!.responseDueFrom !== undefined && <li><Icon name="wrench" size={16} /><span>A recorded response: a capacity, routing, admission or restoration action since the incident began</span></li>}
     </ul>
+  </>;
+  return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
+    <RecoveryCount campaign={c} />
+    {c.dataStage ? <details className="more recovery-requirements"><summary>Recovery requirements</summary>{conditions}</details> : conditions}
     <p className="recovery-note">An unhealthy second resets progress. Pausing freezes it.</p>
   </section>;
 }

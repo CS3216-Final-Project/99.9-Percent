@@ -36,6 +36,26 @@ it("keeps the recovery bar in the pinned incident banner from zero, and the coun
   expect(screen.getAllByRole("progressbar",{name:"Recovery progress"})).toHaveLength(1);
  }
 });
+it.each([1,2])("lists the recovery conditions openly during a Chapter %i incident",chapter=>{
+ show(structuredClone(incidentTransitions.get(chapter)!).incident);
+ const card=screen.getByRole("region",{name:"Incident recovery"});
+ expect(card.querySelector("details")).toBeNull();
+ expect(within(card).getByText(/Latency below/)).toBeTruthy();
+ expect(within(card).getByText(/consecutive game seconds/)).toBeTruthy();
+});
+it.each([3,4,5])("folds the recovery conditions into a closed drop-down the player toggles during a Chapter %i incident",chapter=>{
+ show(structuredClone(incidentTransitions.get(chapter)!).incident);
+ const card=screen.getByRole("region",{name:"Incident recovery"});
+ const details=card.querySelector("details")!,summary=within(card).getByText("Recovery requirements");
+ expect(summary.tagName).toBe("SUMMARY");
+ expect(details.open).toBe(false);
+ expect(details.contains(within(card).getByText(/Latency below/))).toBe(true);
+ expect(details.contains(within(card).getByText(/consecutive game seconds/))).toBe(true);
+ expect(within(card).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+ expect(details.contains(within(card).getByText(/An unhealthy second resets progress/))).toBe(false);
+ fireEvent.click(summary);expect(details.open).toBe(true);
+ fireEvent.click(summary);expect(details.open).toBe(false);
+});
 it.each([
  ["Launch Week",()=>advanceSteps(newGame(1,"launch-title",2),6).state],
  ["Opening",()=>newGame()],

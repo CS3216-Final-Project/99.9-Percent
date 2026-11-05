@@ -29,7 +29,9 @@ The whole playable game uses Warm Classic: title and account screens, both modes
 - **Incident recovery:** keep chapter requirements above the Latency, Errors and Backlog cards during both healthy play and incidents.
   The red banner pins to the top of the scrolling panel and carries the green recovery bar from zero, so the bar never jumps there once progress starts.
   The Recovery progress card below keeps only the n/5 s count.
-  Below those readings, show Recovery progress with its game-second counter and always-visible conditions: latency below 500 ms, service errors below 1%, and accepted traffic with completed requests, for five consecutive game seconds.
+  Below those readings, show Recovery progress with its game-second counter and its conditions: latency below 500 ms, service errors below 1%, and accepted traffic with completed requests, for five consecutive game seconds.
+  The conditions are always visible in Opening and Scaling & Routing, the first two chapters with incidents.
+  From Data Strategy on they fold into a closed Recovery requirements drop-down that the player can open and close; the counter and the reset rule stay visible.
   Explain that an unhealthy second resets progress and pausing freezes it.
   For an active failed server, also show that it must be restored or isolated from traffic with an empty queue.
   Recovery rules stay in the simulation.

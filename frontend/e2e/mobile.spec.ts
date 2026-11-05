@@ -9,7 +9,7 @@ import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { recoveryJourney } from "./incidentRecovery";
-import { pauseArrival } from "./incidentPause";
+import { foldedRecoveryRequirements, pauseArrival } from "./incidentPause";
 import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
@@ -429,6 +429,11 @@ test("recovery conditions are visible without a tooltip, and tapping a button le
   await mute.tap();
   await expect(tip).toBeHidden();
   await expect(mute).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a Chapter 3 incident's recovery requirements open and close with a tap", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
+  await installClock(); await foldedRecoveryRequirements(page, info, 3, true);
 });
 
 test("selects scaling instances through room and evidence on touch",async({page})=>{
