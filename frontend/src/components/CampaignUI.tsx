@@ -285,7 +285,9 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         </div>
         <PinnedRecovery campaign={c} />
       </header>}
-      <ChapterChecklist model={model} stage={stage}/>
+      {/* Next step is the panel's one instruction. The checklist keeps the notices that name what holds the chapter back,
+          but not the wait Next step already explains, nor a won run's note repeating the Campaign complete stage. */}
+      <ChapterChecklist model={{...model,waiting:null,notice:game.outcome==="won"?null:model.notice}} stage={stage}/>
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
         <p>{running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?action.label:actionReady&&action?.action&&!isChapterEntry(action.action)?action.label:actionReady&&action?.action?"Use Next in the chapter bar to continue.":nextAdvice}</p>
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}

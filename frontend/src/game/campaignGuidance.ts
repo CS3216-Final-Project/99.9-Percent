@@ -128,7 +128,7 @@ export function campaignGuidance(g: GameState) {
  else if(launchResearchPending(g))waiting="Launch Week is over. Spend your free research pick on Caching or Autoscaling to see your score.";
  else if(milestoneBlocks(g))pendingAction={label:"Complete Opening"};
  if(!reportsAcknowledged&&g.phase!=="review"&&!c.incident)notice="A recorded recovered report lacks an acknowledgement, but no review is active. Export company evidence for investigation; this guidance cannot safely repair the saved state.";
- if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
+ if(g.phase==="ended") { pendingAction=null;waiting=null;optional=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  const incomplete=requirements.filter(r=>!r.met),completed=requirements.filter(r=>r.met);
  const lockReason=c.spikeStage?notice:pendingAction?`Next action: ${pendingAction.label}.`:incomplete.length?incomplete[0].label:waiting;
  return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};

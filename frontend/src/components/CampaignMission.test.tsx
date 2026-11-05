@@ -27,6 +27,9 @@ function requirements(game:GameState) {
     expect(row.textContent).toContain(r.label);expect(row.getAttribute("data-met")).toBe(String(r.met));
   }
   expect(list.querySelectorAll("[data-requirement]")).toHaveLength(model.requirements.length);
+  // Next step is the panel's one instruction: the checklist never repeats the wait it explains.
+  expect(within(list).queryByRole("status")).toBeNull();
+  if(model.waiting)expect(screen.queryByText(model.waiting)).toBeNull();
   expect(screen.queryByRole("progressbar",{name:"Chapter requirements progress"})).toBeNull();
   expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
   expect(screen.queryByText("View all requirements")).toBeNull();
@@ -75,7 +78,7 @@ it("keeps reliability arming actionable and derives its next scheduled stage",()
 });
 for(const automatic of [false,true]) it(`shows actual ${automatic?"failover":"manual"} failure/recovery state without obsolete chapter metrics`,()=>{
   const game=tick(decide(automatic?preparedReliability():reliabilityCompany(),{type:"arm_reliability"}),10);
-  show(game);requirements(game);
+  show(game);expect(campaignGuidance(game).waiting).not.toBeNull();requirements(game);
   expect(checklist().textContent).toContain("Stable service:");
   expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("not restored");
   expect(screen.queryByText("Installed / healthy")).toBeNull();
@@ -101,7 +104,10 @@ it("shows a completed campaign with its scorecard and no further requirement",()
   const game=decide(completedReliability(),{type:"complete_campaign"});show(game);
   requirements(game);
   expect(checklist().textContent).toContain("Campaign complete");
-  expect(within(checklist()).getByRole("note").textContent).toContain("Campaign complete.");
+  // The stage already says so and Next step says what is left, so no note repeats either, nor Stay Online's purchase advice.
+  expect(within(checklist()).queryByRole("note")).toBeNull();
+  expect(screen.queryByText(/Reliability purchases are optional/)).toBeNull();
+  expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Review the scorecard before starting another company.");
   // Completing needed every Stay Online requirement, and the ended run still shows them all met.
   expect(within(checklist()).getByRole("heading",{level:3}).textContent).toBe("Stay Online · 7/7");
   expect(screen.getByRole("button",{name:"View run scorecard"})).toBeTruthy();

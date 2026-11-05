@@ -145,6 +145,11 @@ it("Spikes future timing never enters guidance",()=>{
 it("missing inactive review is diagnosed rather than silently repaired",()=>{
  const g=recovered();g.phase="management";expect(campaignGuidance(g).notice).toContain("no review is active");expect(campaignGuidance(g).pendingAction).toBeNull();expect(g.campaign!.openingMilestone).toBeNull();
 });
+it("a completed campaign drops Stay Online's purchase advice with its other guidance",()=>{
+ expect(campaignGuidance(completedReliability()).optional).toContain("Reliability purchases are optional");
+ const m=campaignGuidance(act(completedReliability(),{type:"complete_campaign"}));
+ expect(m.optional).toBeNull();expect(m.waiting).toBeNull();expect(m.pendingAction).toBeNull();expect(m.notice).toContain("Campaign complete.");
+});
 it("ended companies offer evidence/restart guidance without continuation",()=>{
  const g=scaling();g.phase="ended";expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).notice).toContain("bankrupt");
 });

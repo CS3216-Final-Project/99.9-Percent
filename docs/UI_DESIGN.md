@@ -327,6 +327,8 @@ Follow [testing.md](testing.md) for static checks and the real WebGL browser sui
 
 In component-inspection mode, Chapters 4 and 5 use a mission panel that leads with the same always-visible chapter checklist as earlier chapters, headed by the chapter's name and completed count (Traffic Spikes & Autoscaling, then Stay Online), with the stage beneath the heading, for example Spike 1 active or Failure scheduled.
 Below it come the existing guidance resolver's next step, essential live warnings and the Inspect Equipment shortcuts.
+Next step is the panel's one instruction: the checklist keeps the notes that name what holds the chapter back, but never repeats a wait Next step already explains, such as a traffic pulse or the reliability failure in progress.
+A completed campaign drops Stay Online's optional purchase note and any note repeating Campaign complete, leaving Next step's Review the scorecard and View run scorecard.
 There is no separate progress bar, unmet-condition box or collapsed requirements disclosure: the checklist already shows each requirement and its engine-derived completion flag.
 Reviews and chapter continuation retain their existing controls and priorities.
 
