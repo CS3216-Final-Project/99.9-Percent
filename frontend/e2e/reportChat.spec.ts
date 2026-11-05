@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { test, expect, expectRoom, seedSave } from "./fixtures";
 import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
+import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 import type { GameState } from "../src/sim";
 
 async function open(page: Page, game: GameState, dialogName: string, width: number) {
@@ -36,9 +37,27 @@ for (const width of [1440, 320]) test(`report chat: Sam asks a failed spike test
     else { expect(b.left).toBeCloseTo(side, 0); expect(b.face === null).toBe(turns[i + 1]?.tag === "DL" || turns[i + 1]?.tag === "P"); }
     if (b.face && b.tag !== "H3") expect(b.face).toContain("/models/avatars/previews/");
   }
+  expect(turns[0].lines).toBe(1);
   await page.screenshot({ path: info.outputPath(`spike-debrief-${width}.png`) });
   // A chat without speakers keeps no empty gutters for pictures it does not show. A fresh copy is styled from scratch,
   // where Chromium leaves the bubbles' gutters stale when the attribute is only removed.
   await dialog.locator(".campaign-incident-report").evaluate(el => { const copy = el.cloneNode(true) as Element; copy.removeAttribute("data-speaker"); el.replaceWith(copy); });
   for (const b of await bubbles(dialog)) { expect(b.face).toBeNull(); expect(Math.round(b.tag === "H3" ? b.right : b.left)).toBe(0); }
+});
+
+test("report chat: bubbles stay readable on a 320px screen", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock();
+  const dialog = await open(page, reliabilityOutcome(true), "Reliability outcome", 320);
+  const turns = await bubbles(dialog);
+  expect(turns.some(b => b.tag === "DL")).toBe(true);
+  for (const b of turns) {
+    // A bubble reaches as far as the other speaker's picture, rather than three quarters of the narrow report.
+    const side = b.faceSize + 8;
+    expect(b.width).toBeLessThanOrEqual(b.chat - 2 * side + 0.5);
+    if (b.tag !== "H3") expect(b.width).toBeGreaterThan(b.chat - 2 * side - 0.5);
+  }
+  expect(turns[0].lines).toBe(1);
+  // A reading's label wraps between words, never a letter or a word to a line, because its value drops below it.
+  for (const dt of await dialog.locator(".report-lesson-summary dt").all()) expect((await dt.boundingBox())!.width).toBeGreaterThan(120);
+  await page.screenshot({ path: info.outputPath("reliability-outcome-320.png") });
 });

@@ -42,9 +42,19 @@
   color: var(--ink);
   transform-origin: bottom left;
 }
-/* A table of readings fills its bubble. */
-:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: calc(75% - var(--report-side)); padding-block: 2px; }
+/* A table of readings fills its bubble. A reading too long to share a line with its label drops below it, so the label
+   never narrows to a letter or a word a line. */
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: 100%; padding-block: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl .row { flex-wrap: wrap; row-gap: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl dt { flex: 1 1 8em; text-wrap: pretty; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl dd { margin-left: auto; }
 :is(.campaign-incident-report, .report-lesson-summary) > section > dl .row:last-child { border-bottom: 0; }
+/* On a phone three quarters of the report leaves a bubble a few words wide, so a bubble only keeps clear of the other
+   speaker's picture there, and the pictures shrink. */
+@media (max-width: 480px) {
+  .campaign-incident-report { --report-face: 24px; }
+  :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) { max-width: calc(100% - 2 * var(--report-face) - 16px); }
+}
 /* Each speaker's picture sits level with the bottom of the bubble, on its outer side; a run of answers shows it once. */
 :is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(h3, p, dl)::before {
   content: "";
@@ -115,9 +125,7 @@
 /* A reading stays on one line; its label wraps instead, so "2,400 req/s" never splits on a phone. */
 .report-capacity .rows dd, .spike-target dd { white-space: nowrap; }
 /* A spike test's target keeps its label whole; on a narrow phone the reading drops below it instead. */
-.spike-target .row { flex-wrap: wrap; row-gap: 2px; }
 .spike-target dt { white-space: nowrap; }
-.spike-target dd { margin-left: auto; }
 .report-explanations { margin: 4px 0 8px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.5; max-width: 75ch; }
 .report-explanations li::marker { color: var(--text-soft); }
 
