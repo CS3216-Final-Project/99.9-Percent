@@ -291,6 +291,8 @@ The Menu holds the run card, Resume, the mode switch and only the Run, Info, Sou
 The room gets most of the screen.
 A 52 px top strip shows Cash and App Health with their icons, sound and Menu; Users and pending revenue sit behind one tap, with pending revenue still marked as not cash yet.
 Guided Mode adds a one-line chapter row with the chapter, goal, Next and Hint, so the strip keeps its width for Cash and App Health.
+A company continued from a larger screen past Scaling & Routing keeps its real chapter in the row, counted out of all five chapters (for example 3/5 Data Strategy), so the row names the same chapter as the sheet's checklist heading.
+The chapters overview lists that chapter as current after the phone's own chapters.
 System metrics is a bottom sheet over the room with peek, half and full states, changed by its handle button, a swipe or the arrow keys; selecting equipment opens it to half and an incident keeps it at least half open.
 The canvas never resizes when the sheet moves.
 Phones walk from above or behind the avatar: View mode offers Overview, Walk mode and Follow, the V key goes round those, and a remembered first person opens as Follow.

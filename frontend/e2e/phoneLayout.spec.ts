@@ -4,7 +4,7 @@ import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { act, reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
 import { advanceCampaignStep, expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
-import { finishingScaling } from "../src/sim/__tests__/dataFixture";
+import { dataCompany, finishingScaling } from "../src/sim/__tests__/dataFixture";
 
 /*
  * The phone edition's layout regions on a touch phone (Pixel 7): the top strip, the System metrics sheet, the dock
@@ -225,6 +225,21 @@ test("Guided Mode top strip: Cash stays visible, users and pending revenue are o
   await overview.getByRole("button", { name: "Back to company", exact: true }).tap();
   await expect(overview).toBeHidden();
   await expectNoHorizontalOverflow(page);
+});
+
+for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) test(`Guided Mode on a ${size.width}px phone: a company continued past Scaling & Routing names its real chapter in the row and the sheet`, async ({ page, withoutRoom }, info) => {
+  await withoutRoom();
+  await openGuided(page, size, dataCompany());
+  const chapters = page.getByRole("region", { name: "Guided Mode chapters" });
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
+  await expect(chapters).toContainText("Chapter 3 of 5");
+  await expect(chapters.locator(".phone-chapter-count")).toHaveText("3/5");
+  await handle(page).tap();
+  const heading = page.getByRole("region", { name: "Guided Mode requirements" }).getByRole("heading", { level: 3 });
+  await expect(heading).toBeInViewport();
+  await expect(heading).toHaveText(/^Data Strategy · \d\/\d$/);
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: info.outputPath(`continued-data-${size.width}.png`) });
 });
 
 for (const mode of ["Guided", "Challenge"] as const) {

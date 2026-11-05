@@ -7,14 +7,14 @@ import { tipProps } from "./tips";
 import "./CampaignChapters.css";
 
 export function CampaignChapters() {
-  const { replaying, current, total, advance, reason, goal } = useChapterBar();
+  const { replaying, current, of, advance, reason, goal } = useChapterBar();
   const [open, setOpen] = useState(false);
   const reasonId = useId();
 
   return <>
     <section className="chapter-bar" aria-label="Guided Mode chapters">
       <div className="chapter-current">
-        <p>{replaying ? "Practice" : `Chapter ${current.number} of ${total}`}</p>
+        <p>{replaying ? "Practice" : `Chapter ${current.number} of ${of}`}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
       </div>
       <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> <span className={current.number >= 1 && current.number <= 5 ? "chapter-goal-text" : undefined}>{goal}</span></p>
