@@ -187,6 +187,7 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Events that would stack higher fold into the top marker at that spot, drawn in paper and ink and labelled "+n" for the n events it stands for; it fills with the selection colour when the selected second is one of theirs.
   The key still lists every event under its own number, with each badge on the event's first line, aligned in one column whatever the second's digits.
   The timeline opens on its worst second, the one furthest past the 500 ms or 1% limit, and writes that second's readings above the plot; the pointer, a tap, the arrow keys, Page Up and Down, Home and End move it, and the selected second's events are highlighted in the key.
+  Each reading in the readout keeps the room of its widest value in that incident, and a second with no requests turned away keeps an empty one where that reading goes, so the readout wraps the same way for every second at any width and the plot never moves under the pointer or finger as the selection does.
   It is a slider for assistive technology, with the readings as its value, and every second's figures, routes and servers stay in a table that screen readers read but the page does not draw.
   The causes list and, in Data Strategy, the workload and cache table follow the timeline.
   A Stay Online incident shows no timeline, whichever chapter it is read in: the timeline sums capacity over the healthy servers while the route can still send traffic to the failed one, so its errors would sit beside apparently spare capacity.

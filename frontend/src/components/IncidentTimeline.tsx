@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { flushSync } from "react-dom";
 import type { EventKind } from "@/sim";
 import type { Snapshot, TraceEvent } from "@/sim/campaignTypes";
@@ -25,6 +25,11 @@ function readings(m: Snapshot) {
     ...(m.rejected > 0 ? [`${num(m.rejected)} req/s turned away`] : [])];
 }
 const reading = (m: Snapshot) => `Game second ${m.step}: ${readings(m).join(", ")}`;
+/**
+ * A reading with its digits as zeros: the readout's figures are tabular, so readings of one shape are equally wide, and
+ * the incident's few shapes stand for all its seconds.
+ */
+const shape = (text: string) => text.replace(/\d/g, "0");
 /** How far a second is past the limit it misses most, so a failure that shows only in its errors still counts. */
 const severity = (m: Snapshot) => Math.max(m.latencyMs / LATENCY_LIMIT_MS, (m.serviceErrorRate ?? 0) / ERROR_LIMIT);
 
@@ -91,6 +96,12 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
   const current = snapshots[Math.min(selected, snapshots.length - 1)];
   const from = Math.min(snapshots[0].step, events[0]?.step ?? Infinity), to = Math.max(snapshots.at(-1)!.step, recoveredStep, events.at(-1)?.step ?? 0);
   const limited = snapshots.some(m => m.rejected > 0);
+  // Each reading in the readout keeps a slot as wide as that reading's widest shape in any of the incident's seconds,
+  // with an empty one for requests turned away when a second has none, so the readout wraps the same way whichever
+  // second is selected and the plot under the pointer never moves. The slots follow the report's width as it changes.
+  const slots = useMemo(() => [snapshots.map(m => `Game second ${m.step}`), ...Array.from({ length: limited ? 5 : 4 }, (_, i) => snapshots.flatMap(m => readings(m)[i] ?? []))]
+    .map(texts => [...new Set(texts.map(shape))]), [snapshots, limited]);
+  const shown = [`Game second ${current.step}`, ...readings(current)];
 
   const loadMax = niceMax(Math.max(...snapshots.flatMap(m => [m.app.demand, m.app.capacity, m.db.demand, m.db.capacity, limited ? m.incoming : 0])));
   const latencyMax = niceMax(Math.max(LATENCY_LIMIT_MS * 1.2, ...snapshots.map(m => m.latencyMs)));
@@ -155,7 +166,10 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
 
   return <section className="incident-timeline" aria-label="Incident timeline">
     <h4>Incident timeline</h4>
-    <p className="timeline-readout" aria-hidden="true"><b>Game second {current.step}</b>{readings(current).map(r => <span key={r}>{r}</span>)}</p>
+    <p className="timeline-readout" aria-hidden="true">{slots.map((room, i) => {
+      const Text = i === 0 ? "b" : "span";
+      return <span key={i} className="timeline-reading"><Text>{shown[i]}</Text>{room.map(s => <Text key={s} className="timeline-reading-room">{s}</Text>)}</span>;
+    })}</p>
     <ul className="timeline-legend" aria-hidden="true">
       <li><i style={{ borderColor: CHART_COLORS.users }} />App Servers demand</li>
       <li><i className="is-dashed" style={{ borderColor: CHART_COLORS.users }} />App Servers capacity</li>

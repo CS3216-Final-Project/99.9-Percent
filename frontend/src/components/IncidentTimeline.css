@@ -1,11 +1,14 @@
 /* An incident's timeline: stacked lanes on one game-second axis, the incident window shaded through all of them. */
 .incident-timeline { margin-block: 12px 4px; }
 .incident-timeline h4 { margin: 0 0 4px; }
-.timeline-readout { display: flex; flex-wrap: wrap; gap: 2px 16px; min-height: calc(2 * 1.4em); margin: 0 0 8px; font-size: var(--text-sm); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.timeline-readout { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0 0 8px; font-size: var(--text-sm); line-height: 1.4; font-variant-numeric: tabular-nums; }
 .timeline-readout b { font-family: var(--font-display); }
-/* Each reading keeps its words together and the gap sets it apart, so no separator is left dangling where a line wraps. */
-.timeline-readout span { white-space: nowrap; }
-.timeline-readout span::first-letter { text-transform: uppercase; }
+/* Each reading's slot stacks the selected second's reading on its widest shapes, which hold the slot open unseen. Each
+   keeps its words together and the gap sets it apart, so no separator is left dangling where a line wraps. */
+.timeline-reading { display: inline-grid; }
+.timeline-reading > * { grid-area: 1 / 1; white-space: nowrap; }
+.timeline-reading > *::first-letter { text-transform: uppercase; }
+.timeline-reading-room { visibility: hidden; }
 .timeline-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 4px; padding: 0; list-style: none; font-size: var(--text-xs); color: var(--text-soft); }
 .timeline-legend i { display: inline-block; width: 16px; margin-right: 5px; vertical-align: middle; border-top: 2.5px solid; }
 .timeline-legend i.is-dashed { border-top-style: dashed; }

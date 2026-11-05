@@ -156,6 +156,53 @@ for (const [width, height] of [[1440, 900], [320, 640]]) test(`a burst of events
   await page.screenshot({ path: info.outputPath(`crowded-${width}.png`) });
 });
 
+/**
+ * Moves the selection through every second of the window by keyboard, from Home to End, and reports how far below
+ * the top of the timeline the plot sits after each move. It is measured within the timeline, so the report scrolling
+ * or settling around it does not count.
+ */
+async function plotPositions(page: Page, slider: Locator) {
+  await slider.focus();
+  await page.keyboard.press("Home");
+  // Each move is measured as soon as it is drawn into the page: the slider's value changes in the same commit as the
+  // readout, and reading the plot's box then lays the page out as it will be painted.
+  await slider.evaluate(plot => {
+    const where = () => ({ second: plot.getAttribute("aria-valuenow")!, offset: plot.getBoundingClientRect().top - plot.closest(".incident-timeline")!.getBoundingClientRect().top });
+    const seen = [where()];
+    (window as unknown as { seen: typeof seen }).seen = seen;
+    new MutationObserver(() => seen.push(where())).observe(plot, { attributeFilter: ["aria-valuenow"] });
+  });
+  const [first, last] = await Promise.all([slider.getAttribute("aria-valuemin"), slider.getAttribute("aria-valuemax")]);
+  for (let i = Number(first); i < Number(last); i++) await page.keyboard.press("ArrowRight");
+  // And the two longest jumps, to the first second and back to the last.
+  for (const key of ["Home", "End"]) await page.keyboard.press(key);
+  await expect(slider).toHaveAttribute("aria-valuenow", last!);
+  return page.evaluate(() => (window as unknown as { seen: { second: string; offset: number }[] }).seen);
+}
+
+for (const [width, height] of [[1440, 900], [390, 844], [320, 640]]) for (const [name, fixture] of [["a slow response", slowResponse], ["a burst of decisions under a traffic limit", crowdedResponse]] as const) {
+  // A desktop only checks that the room kept is no empty gap, on the incident with the most readings.
+  if (width > 900 && fixture === slowResponse) continue;
+  test(`the plot holds still while the selected second changes after ${name} at ${width} px`, async ({ page, withoutRoom }, info) => {
+    await withoutRoom();
+    await page.setViewportSize({ width, height });
+    await page.route("**/api/**", route => route.abort()); await seedSave(page, fixture()); await page.goto("/");
+    await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+    const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
+    const slider = await openTimeline(page, report);
+    const seen = await plotPositions(page, slider);
+    // Whatever second is selected, its readings wrap into the room the timeline keeps for its longest one, so the
+    // plot under the pointer or finger never moves.
+    const moved = seen.filter(p => Math.abs(p.offset - seen[0].offset) > 0.5);
+    expect(moved.map(p => `second ${p.second}: ${(p.offset - seen[0].offset).toFixed(1)} px`)).toEqual([]);
+    // The room is the longest readings' and no more: a desktop holds them in at most two lines.
+    const readout = await report.locator(".timeline-readout").evaluate(el => ({ height: el.getBoundingClientRect().height, line: parseFloat(getComputedStyle(el).lineHeight) }));
+    if (width >= 900) expect(readout.height).toBeLessThanOrEqual(2 * readout.line + 2 + 0.5);
+    await slider.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath(`readout-${width}.png`) });
+  });
+}
+
 // On a desktop the closed details lay the plot out narrower than it opens; on a phone the widths match.
 test("the first frame after the technical details open is drawn at the plot's width", async ({ page, withoutRoom }) => {
   await withoutRoom();

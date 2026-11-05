@@ -66,7 +66,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const start = { x: 60, y: plot.height / 2 };
   if (touch) await timeline.tap({ position: start }); else await timeline.hover({ position: start });
   await expect(timeline).toHaveAttribute("aria-valuenow", String(first.step));
-  await expect(report.locator(".timeline-readout b")).toHaveText(`Game second ${first.step}`);
+  await expect(report.locator(".timeline-readout b:not(.timeline-reading-room)")).toHaveText(`Game second ${first.step}`);
   await timeline.focus(); await page.keyboard.press("End");
   await expect(timeline).toHaveAttribute("aria-valuenow", String(recoveredReport.snapshots.at(-1)!.step));
   await timeline.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath("timeline.png") });
