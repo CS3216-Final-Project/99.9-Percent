@@ -150,7 +150,7 @@ const CHAPTERS = {
       "Stay online",
       "The test makes one App Server fail. Manual and automatic responses are available.",
       "Explore the reliability controls on Monitoring, App Server and Network before starting the test.",
-      '.campaign-panel [aria-label="Chapter Progress"]',
+      '.campaign-panel [aria-label="Guided Mode requirements"]',
     ),
     {
       title: "Unlock Health Checks",

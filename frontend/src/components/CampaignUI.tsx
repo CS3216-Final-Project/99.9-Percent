@@ -92,6 +92,15 @@ const OFFICE_EVIDENCE = {
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
+function ChapterChecklist({model,stage}:{model:ReturnType<typeof campaignGuidance>;stage?:string}) {
+  return <section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{model.stage}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
+    {stage&&<p className="mission-stage">{stage}</p>}
+    <RequirementList items={model.requirements}/>
+    {model.waiting&&<p role="status">{model.waiting}</p>}
+    {model.notice&&<p role="note">{model.notice}</p>}
+    {model.optional&&<p className="muted">{model.optional}</p>}
+  </section>;
+}
 
 // Progress is derived from the engine; reading this panel never advances the run.
 function CampaignGuidance() {
@@ -99,12 +108,7 @@ function CampaignGuidance() {
   const model=campaignGuidance(game),action=model.pendingAction;
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
-    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{model.stage}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
-      <RequirementList items={model.requirements}/>
-      {model.waiting&&<p role="status">{model.waiting}</p>}
-      {model.notice&&<p role="note">{model.notice}</p>}
-      {model.optional&&<p className="muted">{model.optional}</p>}
-    </section>}
+    {model.requirements.length>0&&<ChapterChecklist model={model}/>}
     {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
@@ -267,20 +271,9 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const spike=chapter4Stage(game);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
-  const checksProgress=game.phase==="ended"?null:reliability?.fault?.restoredStep!=null&&reliability.completedStep===null?{label:"Stable service",steps:reliability.stableSteps}
-    :spike?.stage==="recover"&&c.spikeStage!.completedStep===null?{label:"Stable baseline",steps:c.spikeStage!.baselineStableSteps}
-    :null;
-  const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":m.app.backlog+m.db.backlog>0?"queues":null;
-  const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
-  const condition=game.phase==="ended"?model.notice:reviewing?action.label:unmet?`Still needed: ${unmet.label}`:(action?`Ready: ${action.label}`:"All current requirements met.");
-  // Readiness and an ended run are not unmet conditions, so they are headed as the company's status.
-  const conditionTitle=game.phase!=="ended"&&(reviewing||unmet)?"Current unmet condition":"Current status";
   const stage=game.phase==="ended"&&game.outcome==="won"?"Campaign complete"
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
     :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":spikeStageLabel(c,spike);
-  const objectiveIds=reliability?["armed","observed","restored","observations","recognition"]:["test","pulses","observations","recognition"];
-  const objectives=model.requirements.filter(r=>objectiveIds.includes(r.id));
-  const currentObjective=objectives.find(r=>!r.met)?.id;
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
   const showMetrics=!!c.incident||m.app.backlog+m.db.backlog>0||spike?.stage==="spike1"||spike?.stage==="spike2";
   return <EquipmentPanel className="campaign-panel mission-dashboard" label="System metrics">
@@ -292,17 +285,9 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         </div>
         <PinnedRecovery campaign={c} />
       </header>}
-      <section aria-label="Chapter Progress" className="mission-progress">
-        <h3>{model.stage}</h3>
-        <p className="mission-stage">{stage}</p>
-        <Meter value={model.completed.length/Math.max(1,model.requirements.length)} label="Chapter requirements progress" tone="ok"/>
-        <p className="mission-complete">{model.completed.length} / {model.requirements.length} current requirements met</p>
-        <ol className="mission-objectives">{objectives.map(r=><li key={r.id} data-state={r.met?"completed":r.id===currentObjective?"current":"upcoming"} aria-current={r.id===currentObjective?"step":undefined}><Icon name={r.met?"check":r.id===currentObjective?"next":"time"} size={12}/><span>{r.label}</span><span className="visually-hidden">{r.met?"Completed":r.id===currentObjective?"Current":"Upcoming"}</span></li>)}</ol>
-      </section>
-      <section aria-label={conditionTitle} className={`mission-condition${incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":conditionTitle==="Current status"?" is-met":""}`}><h4>{conditionTitle}</h4><p>{condition}</p></section>
+      <ChapterChecklist model={model} stage={stage}/>
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
         <p>{running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?action.label:actionReady&&action?.action&&!isChapterEntry(action.action)?action.label:actionReady&&action?.action?"Use Next in the chapter bar to continue.":nextAdvice}</p>
-        {checksProgress&&<><p className="mission-readiness">{checksProgress.label}: {checksProgress.steps} / 5</p><Meter value={checksProgress.steps/5} label={`${checksProgress.label} progress`} tone="ok"/></>}
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}
         {reviewing&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next"/></button>}
         {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}><Icon name="goal" size={16} />View run scorecard</button>}
@@ -318,10 +303,6 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         </div>)}
       </section>
       <EquipmentShortcuts disabled={disabled}/>
-      <details className="more mission-requirements"><summary>View all requirements</summary>
-        <section className="campaign-requirements" aria-label="Guided Mode requirements"><h4>Chapter requirements</h4><RequirementList items={model.requirements}/></section>
-        {model.waiting&&<p>{model.waiting}</p>}{model.notice&&<p role="note">{model.notice}</p>}{model.optional&&<p className="muted">{model.optional}</p>}
-      </details>
     </section>
   </EquipmentPanel>;
 }

@@ -70,7 +70,7 @@ test("Stay Online guide unlocks Health Checks in Tech as one box and confirms it
   await seedSave(page,readyReliability(),{chapterTours:["scaling","data","spikes"]});
   await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
   // Traffic Spikes' panel is headed with the chapter's own name.
-  await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("heading",{name:"Traffic Spikes & Autoscaling",exact:true})).toBeVisible();
+  await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("heading",{name:/^Traffic Spikes & Autoscaling · \d+\/\d+$/})).toBeVisible();
   await page.screenshot({path:info.outputPath("panel-traffic-spikes.png")});
   await page.getByRole("button",{name:"Next: Continue to Stay Online",exact:true}).click();
   const guide=(step:number)=>page.getByRole("dialog",{name:`Chapter guide, step ${step} of 7`,exact:true});

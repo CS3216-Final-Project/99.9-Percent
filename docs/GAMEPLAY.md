@@ -185,7 +185,10 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Escape, Close and a click outside the menu all mean Stay in this chapter: the recognition is acknowledged and the menu does not return for that company.
 - A company that stays after Launch Week or the Opening remains in that finished chapter: none of Scaling & Routing's controls or requirements appear until Next enters it.
 - An Opening the player stays in is remembered for that company in the browser's profile, so the next Play does not move it into Scaling & Routing; a company loaded without that record, such as an older save, an import or a cloud restore, still continues into Scaling & Routing on Play.
-- Chapter requirements list each gate as met or unmet, without revealing future deadlines.
+- Chapter requirements list each gate the player acts on as met or unmet, without revealing future deadlines.
+  Gates every chapter implies stay in the engine but are not listed: no active incident, postmortems and reports read, the previous chapter finished, and positive cash, which a running company always has because zero cash ends it.
+  Rows another row already covers are not listed either: Traffic Spikes' stable baseline only counts at baseline traffic, and Stay Online's restored server implies its failure was observed.
+  Scaling & Routing lists database headroom, growth and empty queues; Data Strategy lists growth, empty queues and healthy requests; Traffic Spikes lists its test (or pulses), empty queues, healthy requests, stable baseline and the acknowledged response; Stay Online lists finished pending actions, empty queues, healthy requests, the started test, the restored server, stable service and the acknowledged outcome.
 - Each chapter keeps the same requirement rows for its whole length, so its count never changes mid-chapter; a row that stops applying, such as Scaling's database headroom after its growth wave, stays listed as met.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - The Opening's first Run (its first game second) moves the view to the server floor's In gate, where requests enter.

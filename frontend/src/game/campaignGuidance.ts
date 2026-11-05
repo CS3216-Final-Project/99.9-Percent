@@ -9,7 +9,6 @@ import { canEnterSpikes, gradedSpikes, pendingSpikeAcknowledgement, pendingSpike
 import { PASS_SHARE, servedShare } from "./chapter4Guidance";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 
 export interface Requirement { id: string; label: string; met: boolean }
 /**
@@ -60,20 +59,14 @@ export function campaignGuidance(g: GameState) {
  if(introductionActive(c)) {
   for(const id of INTRODUCTION_COMPONENTS)add(id,`${INTRODUCTION_COPY[id].name} explored`,c.launchWeek!.introduction!.explored.includes(id));
   notice=introductionInstruction(c).message;
- } else if(c.reliabilityStage){const d=c.reliabilityStage;add("cash","Positive company cash",c.cashCents>0);add("management","Management resumed after any report",g.phase==="management"||g.outcome==="won");add("incident","No active incident",!c.incident);add("queues","All retained Application and Database queues empty",queuesEmpty);add("healthy","Measured healthy latency and service errors",qualifiesForRecovery(c.snapshot));add("pending","Accepted actions finish before arming",!!d.fault||c.pending.length===0);add("armed","Reliability test started",!!d.fault);add("observed","Application failure observed",d.fault?.startedStep!==null&&!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("reports","Recovered reports acknowledged",reportsAcknowledged);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Run to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;if(canCompleteCampaign(g)){notice="Stay Online completed. Complete the campaign through Next in the chapter bar when you are ready.";pendingAction={label:"Complete campaign",action:{type:"complete_campaign"}};}else notice=waitsFor("The campaign",entryBlockers(false,completionGates(g),"Stay Online"),"can be completed");}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
+ } else if(c.reliabilityStage){const d=c.reliabilityStage;add("pending","Accepted actions finish before arming",!!d.fault||c.pending.length===0);add("queues","Application and Database queues empty",queuesEmpty);add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));add("armed","Reliability test started",!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Run to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;if(canCompleteCampaign(g)){notice="Stay Online completed. Complete the campaign through Next in the chapter bar when you are ready.";pendingAction={label:"Complete campaign",action:{type:"complete_campaign"}};}else notice=waitsFor("The campaign",entryBlockers(false,completionGates(g),"Stay Online"),"can be completed");}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
   const d=c.spikeStage,graded=gradedSpikes(d),last=d.pulses?.filter(p=>p.graded&&p.result!==null).at(-1);
   if(graded)add("test",`A graded spike served at least ${PASS_SHARE} of its requests${last?` (last test: ${servedShare(last)})`:""}`,spikeTestPassed(d));
   else add("pulses","Both traffic pulses completed",c.step>=d.deadlines[3]);
-  add("management","Operating in management, not a pending review",g.phase==="management");
-  add("incident","No active incident",!c.incident);
   add("queues","Application and Database queues empty",queuesEmpty);
-  add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
-  add("baseline","Current traffic is back to baseline",c.incomingRate===T.baseline);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   add("observations",`Stable baseline observations: ${d.baselineStableSteps} / 5`,d.completedStep!==null);
   add("recognition","Spike response acknowledged",d.acknowledged);
-  // Stay Online's entry also checks cash, so the requirements name it with the rest.
-  add("cash","Positive company cash",c.cashCents>0);
   notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g),"Traffic Spikes")):d.completedStep!==null?"Stay Online opens after you review the spike response.":null;
   const responses=graded?"Manual capacity, autoscaling or both can pass the test; a traffic limit protects service, but its rejected requests count against the test."
     :"Manual capacity, admission relief and hybrid responses remain valid.";
@@ -90,12 +83,7 @@ export function campaignGuidance(g: GameState) {
   else if(pendingSpikeDebrief(c))pendingAction={label:"Review spike test result"};
  } else if(c.dataStage) {
   add("growth","Data growth occurred",c.dataStage.consumed);
-  add("cash","Positive company cash",c.cashCents>0);
-  add("milestone","Opening milestone acknowledged",openingDone);
-  add("management","Operating in management, not a pending review",g.phase==="management");
-  add("incident","No active incident",!c.incident);
   add("queues","Application and Database queues empty",queuesEmpty);
-  add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   if(!c.dataStage.consumed&&!canEnterData(g))notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to Traffic Spikes",action:{type:"enter_spikes"}};
@@ -105,14 +93,9 @@ export function campaignGuidance(g: GameState) {
   if(g.phase!=="ended")notice=`${c.launchWeek?"Launch Week":"The Opening"} is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.`;
   if(g.phase!=="ended")pendingAction={label:"Continue to Scaling & Routing",action:{type:"enter_scaling"}};
  } else if(openingDone) {
-  add("opening","Opening completed",openingDone);
-  add("stage","Scaling stage active",!!c.scaling);
   add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,!!c.scaling?.consumed||c.dbCapacity>=P.dbCapacity||!!c.scalingConsent);
-  add("management","Operating in management, not a pending review",g.phase==="management");
-  add("incident","No active incident",!c.incident);
-  add("queues","Application and Database queues empty",queuesEmpty);
   add("growth","Scaling growth occurred",!!c.scaling?.consumed);
-  add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
+  add("queues","Application and Database queues empty",queuesEmpty);
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
   if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
@@ -125,7 +108,6 @@ export function campaignGuidance(g: GameState) {
   else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. Complete the verified Opening recognition to continue to Scaling & Routing.";
  } else if(c.launchWeek) {
   const lw=c.launchWeek;
-  add("cash","Positive company cash",c.cashCents>0);
   add("research","Research pick spent",!!lw.tech);
   add("launch","Launch Week survived",lw.completedStep!==null);
   add("milestone","Opening milestone acknowledged",openingDone);
