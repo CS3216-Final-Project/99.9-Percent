@@ -113,11 +113,12 @@ test("a code chip copies whole: a click takes the full run ID or seed, and the t
     await expectSelects(page, run, runId, gesture);
     await expectSelects(page, seedChip, seed, gesture);
   }
-  // A drag from the run ID across the seed copies both, each on its own line.
+  // A drag from the run ID across the seed copies both, each on its own line. It ends just past the seed: inside a
+  // one-digit chip's padding, Linux Chromium places the end before the digit where macOS places it after.
   const from = (await run.boundingBox())!, to = (await seedChip.boundingBox())!;
   await page.evaluate(() => getSelection()?.removeAllRanges());
   await page.mouse.move(from.x + 2, from.y + from.height / 2); await page.mouse.down();
-  await page.mouse.move(to.x + to.width - 2, to.y + to.height / 2, { steps: 4 }); await page.mouse.up();
+  await page.mouse.move(to.x + to.width + 8, to.y + to.height / 2, { steps: 4 }); await page.mouse.up();
   const dragged = await page.evaluate(() => getSelection()?.toString() ?? "");
   expect(dragged.split(/\s+/).filter(Boolean)).toEqual([runId, seed]);
   await run.scrollIntoViewIfNeeded();
