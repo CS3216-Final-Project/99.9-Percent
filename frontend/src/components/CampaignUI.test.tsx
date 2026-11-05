@@ -36,9 +36,40 @@ it("keeps the recovery bar in the pinned incident banner from zero, and the coun
   expect(screen.getAllByRole("progressbar",{name:"Recovery progress"})).toHaveLength(1);
  }
 });
+it.each([1,2])("lists the recovery conditions openly during a Chapter %i incident",chapter=>{
+ show(structuredClone(incidentTransitions.get(chapter)!).incident);
+ const card=screen.getByRole("region",{name:"Incident recovery"});
+ expect(card.querySelector("details")).toBeNull();
+ expect(within(card).getByText(/Latency below/)).toBeTruthy();
+ expect(within(card).getByText(/consecutive game seconds/)).toBeTruthy();
+});
+it.each([3,4,5])("folds the recovery conditions into a closed drop-down the player toggles during a Chapter %i incident",chapter=>{
+ show(structuredClone(incidentTransitions.get(chapter)!).incident);
+ const card=screen.getByRole("region",{name:"Incident recovery"});
+ const details=card.querySelector("details")!,summary=within(card).getByText("Recovery requirements");
+ expect(summary.tagName).toBe("SUMMARY");
+ expect(details.open).toBe(false);
+ expect(details.contains(within(card).getByText(/Latency below/))).toBe(true);
+ expect(details.contains(within(card).getByText(/consecutive game seconds/))).toBe(true);
+ expect(within(card).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+ expect(details.contains(within(card).getByText(/An unhealthy second resets progress/))).toBe(false);
+ fireEvent.click(summary);expect(details.open).toBe(true);
+ fireEvent.click(summary);expect(details.open).toBe(false);
+});
+it.each([
+ ["Launch Week",()=>advanceSteps(newGame(1,"launch-title",2),6).state],
+ ["Opening",()=>newGame()],
+ ["Scaling & Routing",()=>dataCompany("read-heavy",false)],
+ ["Data Strategy",()=>dataCompany()],
+])("titles the %s requirements with the chapter the chapter bar marks current",(name,company)=>{
+ const game=company();show(game);
+ expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe(name);
+ const heading=within(screen.getByRole("region",{name:"Guided Mode requirements"})).getByRole("heading",{level:3});
+ expect(heading.textContent).toMatch(new RegExp(`^${name.replace("&","\\&")} · \\d+/\\d+$`));
+});
 it("shows all Opening requirements without a disclosure or generic growth-waiting message",()=>{
  show(newGame());const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
- expect(within(requirements).getByRole("heading",{name:/Chapter requirements/})).toBeTruthy();
+ expect(within(requirements).getByRole("heading",{name:/^Opening/})).toBeTruthy();
  expect(within(requirements).getAllByRole("listitem")).toHaveLength(3);
  expect(requirements.querySelector("summary")).toBeNull();
  expect(screen.queryByText(/Waiting for the next company growth event/)).toBeNull();
@@ -47,7 +78,7 @@ it("keeps the selected workload hidden until actual growth and enters through th
  show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
  expect(screen.getByLabelText("Current objective").textContent).toContain("Prepare the system for the next growth wave.");
  expect(guide.textContent).not.toContain("Prepare the system for the next growth wave.");
- expect(within(guide).getByText(/Chapter requirements/)).toBeTruthy();
+ expect(within(guide).getByRole("heading",{name:/^Scaling & Routing/})).toBeTruthy();
  expect(within(guide).queryByRole("button",{name:/Continue to Data Strategy/})).toBeNull();
  fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to Data Strategy/}));
  expect(useGame.getState().tour?.track).toBe("data");

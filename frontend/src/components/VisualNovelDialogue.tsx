@@ -46,8 +46,7 @@ export function VisualNovelDialogue({ label, lines, ending, endLabel, dismissLab
     }}>
       <img key={portrait.src} className="dialogue-portrait" src={portrait.src} alt={portrait.alt} width={768} height={768} draggable={false} onError={event => { event.currentTarget.dataset.broken = ""; }}/>
       <div className="dialogue-box" data-more={!last || undefined} onClick={event => {
-        // Selecting text to copy it is not a request for the next line.
-        if ((event.target as Element).closest("button") || window.getSelection()?.isCollapsed === false) return;
+        if ((event.target as Element).closest("button")) return;
         next(); primary.current?.focus();
       }}>
         <p className="dialogue-plate"><strong>{speaker.name}</strong><span>{speaker.role}</span></p>

@@ -9,6 +9,8 @@ const dollars = (cents: number) => new Intl.NumberFormat("en-US", { style: "curr
  * is the dialog's own state, so it would only ever read "no" while the dialog asks for it.
  */
 const HIDDEN = /^(id|.*Id|.*Version|version|configuration|snapshot|snapshotStep|acknowledged)$/;
+/** A seed a player may copy into a bug report: shown as recorded and selectable, never as a formatted number. */
+const COPYABLE = /^seed$/;
 /** Shares and rates the engine stores in basis points (6,000 means 60%). */
 const BASIS_POINTS = /(BasisPoints|[Hh]itRate|[Hh]itRateUsed|[Ww]armth|[Ww]armthUsed|[Ww]armthAfterStep|[Ss]hare)$/;
 
@@ -36,16 +38,16 @@ function format(key: string, value: Value): string {
   return "recorded";
 }
 /** Flatten one level of nesting so a record reads as label/value pairs, never as raw JSON. */
-function entries(data: Record<string, Value>, prefix = ""): [string, string][] {
+function entries(data: Record<string, Value>, prefix = ""): [string, string, boolean][] {
   return Object.entries(data).filter(([key]) => !HIDDEN.test(key)).flatMap(([key, value]) =>
     value && typeof value === "object" && !Array.isArray(value) && !Array.isArray((value as { targets?: unknown }).targets) && !prefix
       ? entries(value as Record<string, Value>, label(key))
-      : [[prefix ? `${prefix} · ${label(key).toLowerCase()}` : label(key), format(key, value)] as [string, string]]);
+      : [[prefix ? `${prefix} · ${label(key).toLowerCase()}` : label(key), COPYABLE.test(key) ? String(value) : format(key, value), COPYABLE.test(key)] as [string, string, boolean]]);
 }
 
 /** A recorded engine object shown as a compact definition list. */
 export function RecordedFields({ data }: { data: object }) {
   const rows = entries(data as Record<string, Value>);
   if (!rows.length) return null;
-  return <dl className="recorded-fields">{rows.map(([k, v], i) => <Fragment key={i}><dt>{k}</dt><dd>{v}</dd></Fragment>)}</dl>;
+  return <dl className="recorded-fields">{rows.map(([k, v, copy], i) => <Fragment key={i}><dt>{k}</dt><dd>{copy ? <code>{v}</code> : v}</dd></Fragment>)}</dl>;
 }

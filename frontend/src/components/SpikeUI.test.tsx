@@ -18,7 +18,7 @@ it("extends the current strip with factual available continuation and no new sto
  fireEvent.click(screen.getByRole("button",{name:"Next: Continue to Traffic Spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
- show(untilOffset(spikeCompany(),13));expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Spike 1 active");
+ show(untilOffset(spikeCompany(),13));expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).toContain("Spike 1 active");
  fireEvent.click(screen.getByRole("button",{name:"App Server"}));
  fireEvent.click(screen.getByRole("button",{name:"Server management"}));fireEvent.click(screen.getByRole("button",{name:"Autoscaling"}));expect(screen.getByRole("region",{name:"Autoscaling"}).textContent).toContain("3 game seconds, followed by 1 routing game second");
  fireEvent.click(screen.getByRole("button",{name:"Back to Server management"}));expect(document.querySelector(".inspection-warning")?.textContent).toContain("installed capacity does not receive traffic");

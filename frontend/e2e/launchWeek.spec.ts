@@ -73,7 +73,7 @@ test("Complete Opening stays hidden until the week is over, even with the milest
   await withoutRoom();
   await bootPanel(page, recovered());
   const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
-  await expect(guidance.getByRole("region", { name: "Guided Mode requirements" })).toContainText("1/4");
+  await expect(guidance.getByRole("region", { name: "Guided Mode requirements" })).toContainText("0/3");
   await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
 });
 

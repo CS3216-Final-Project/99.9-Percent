@@ -25,7 +25,6 @@ it("shows unmet Data requirements without an optional-purchases note",()=>{
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);show(g);
- fireEvent.click(screen.getByText("View all requirements"));
  expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(screen.getByRole("region",{name:"Campaign mission dashboard"}).textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);

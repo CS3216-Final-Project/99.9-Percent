@@ -56,6 +56,8 @@ test("failed saves require confirmation, retain focus on cancel and allow a succ
   await menu.getByRole("button", { name: "Exit", exact: true }).click();
   await confirm.getByRole("button", { name: "Save and exit", exact: true }).click();
   await expect(confirm.getByRole("alert")).toContainText("Saving still failed");
+  // The confirmation says the company is not saved, so no toast says it again over its actions.
+  expect(await page.getByRole("alert").count()).toBe(1);
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe(raw);
   await page.screenshot({ path: "test-results/menu-exit-confirm.png" });
   await page.evaluate(() => sessionStorage.removeItem("fail-menu-save"));

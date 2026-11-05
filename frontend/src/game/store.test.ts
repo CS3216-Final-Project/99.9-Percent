@@ -184,6 +184,8 @@ describe("game modes", () => {
     });
     expect(useGame.getState().switchMode("classic")).toBe(false);
     expect(useGame.getState()).toMatchObject({ mode: "campaign", game: { campaign: { step: 6 } } });
+    // Only the save stood in the way, so the player may choose to switch anyway.
+    expect(useGame.getState().canSwitchMode("classic")).toBe(true);
     expect(useGame.getState().switchMode("classic", { discard: true })).toBe(true);
     expect(useGame.getState().mode).toBe("classic");
   });
@@ -395,6 +397,11 @@ describe("challenge mode lock", () => {
     expect(useGame.getState()).toMatchObject({ mode: "campaign", game: campaign, started: true });
     expect(useGame.getState().toast?.text).toBe(LOCKED);
     expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+    // A locked mode is not a failed save: discarding the company would not open it.
+    expect(useGame.getState().canSwitchMode("classic")).toBe(false);
+    expect(useGame.getState().canSwitchMode("campaign")).toBe(true);
+    useGame.setState({ cloudBusy: true });
+    expect(useGame.getState().canSwitchMode("campaign")).toBe(false);
   });
   it("refuses a Classic import while locked, keeping both modes untouched", () => {
     enter(); const before = useGame.getState().game;

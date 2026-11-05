@@ -10,9 +10,13 @@ describe("readable recorded events", () => {
       event(2, 5, "action-activated", { actionId: "a1", dbBefore: 1000, dbAfter: 2000, appBefore: 1600, appAfter: 1600 }),
       event(3, 5, "metrics", { latencyMs: 100 })];
     expect(describeEvents(events)).toEqual([
-      { id: 1, step: 2, title: "Database upgrade requested", detail: "Setup $2,500.00 · Activates at game second 5" },
-      { id: 2, step: 5, title: "Database upgrade activated", detail: "Database capacity 1,000 to 2,000 ops/s" },
+      { id: 1, step: 2, title: "Database upgrade requested", detail: "Setup $2,500.00 · Activates at game second 5", kind: "decision" },
+      { id: 2, step: 5, title: "Database upgrade activated", detail: "Database capacity 1,000 to 2,000 ops/s", kind: "decision" },
     ]);
+  });
+  it("marks an incident opening, a failure and a recovery the way History's feed does", () => {
+    expect(describeEvents([event(1, 2, "incident-opened", { component: "db" }), event(2, 3, "reliability-failure-started", { appId: "app-1" }), event(3, 9, "incident-recovered"), event(4, 9, "settlement", { period: 1 })]).map(e => e.kind))
+      .toEqual(["incident", "incident", "success", "finance"]);
   });
   it("does not invent an action when the retained request is unavailable", () => {
     expect(describeEvents([event(1, 5, "action-activated", { actionId: "old" })])[0]).toMatchObject({ title: "Infrastructure change activated", detail: null });
@@ -39,10 +43,10 @@ describe("readable recorded events", () => {
       event(3, 5, "autoscaler-blocked", { reason: "Cooldown" }),
       event(4, 9, "autoscaler-blocked", { reason: null })];
     expect(describeEvents(events)).toEqual([
-      { id: 1, step: 3, title: "Autoscaler: +Server 3", detail: null },
-      { id: 2, step: 4, title: "Autoscaler: -Server 4", detail: "retiring" },
-      { id: 3, step: 5, title: "Autoscaler: paused", detail: "cooldown" },
-      { id: 4, step: 9, title: "Autoscaler: observing", detail: null },
+      { id: 1, step: 3, title: "Autoscaler: +Server 3", detail: null, kind: "decision" },
+      { id: 2, step: 4, title: "Autoscaler: -Server 4", detail: "retiring", kind: "decision" },
+      { id: 3, step: 5, title: "Autoscaler: paused", detail: "cooldown", kind: "warning" },
+      { id: 4, step: 9, title: "Autoscaler: observing", detail: null, kind: "success" },
     ]);
     expect(autoscalerActivity([], events)).toEqual(["Autoscaler: +Server 3", "Autoscaler: -Server 4 retiring", "Autoscaler paused: cooldown", "Autoscaler: observing"]);
   });

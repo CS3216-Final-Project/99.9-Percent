@@ -100,7 +100,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
       ? "Your database may struggle when more users arrive. Upgrade it to prepare, or accept the risk and continue."
       : upgrade ? "Your database may struggle when more users arrive. Upgrade it to prepare for growth."
       : risk ? "Your database may struggle when more users arrive. Consider growth with current capacity to review the risk before continuing."
-      : "Your database may struggle when more users arrive. Check Chapter requirements before continuing.";
+      : "Your database may struggle when more users arrive. Check the chapter requirements before continuing.";
     return { ...decision, attention: upgrade || risk ? "hint" : null, message, growthChoices: { upgrade, risk }, key: `${decision.key}:${!!upgrade}:${risk}` };
   }
   if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "isolated-failure"].includes(decision.reason)) return decision;
@@ -378,7 +378,7 @@ function baseAttention(game: GameState): AttentionDecision {
     if (!fault) {
       if (previewCampaignAction(game, { type: "arm_reliability" }).ok)
         return progression("arm", "The company is ready for the reliability test.", "Choose Start reliability test when you are ready. Reliability purchases are optional.", "reliability");
-      return hint("arm-requirements", "The reliability test is not ready to start.", "Use View chapters to review the journey, and compare Chapter requirements before starting the test.", "requirements");
+      return hint("arm-requirements", "The reliability test is not ready to start.", "Use View chapters to review the journey, and compare the chapter requirements before starting the test.", "requirements");
     }
     if (fault.startedStep === null) return run("scheduled-failure", "The reliability test is armed; the failure has not happened yet.");
     if (fault.restoredStep === null)
@@ -551,7 +551,7 @@ function baseAttention(game: GameState): AttentionDecision {
       const graded = gradedSpikes(d);
       return { ...run("spike-stability", `${graded ? "The spike test passed" : "Both pulses ended"}. Stable baseline observations: ${d.baselineStableSteps} / 5.`), message: `${graded ? "The spike test passed" : "Both spikes ended"}. Press Run to verify stability: ${d.baselineStableSteps} of 5 observations.${limited ? " Your limit still rejects requests." : ""}` };
     }
-    return hint("requirements", "No remaining traffic pulse or qualifying baseline observation is identified.", "Use View chapters to compare the unfinished Chapter requirements with the current readings.", "requirements");
+    return hint("requirements", "No remaining traffic pulse or qualifying baseline observation is identified.", "Use View chapters to compare the unfinished chapter requirements with the current readings.", "requirements");
   }
   if (c.dataStage && !c.dataStage.consumed && canEnterData(game)) return run("data-growth", "The company is ready to observe the scheduled workload increase.");
   if (c.scaling && !c.scaling.consumed) {
@@ -561,10 +561,10 @@ function baseAttention(game: GameState): AttentionDecision {
   if (!c.consumedEvents.includes("opening-growth")) return run("opening-growth", "The first scheduled growth has not arrived yet.");
   if (preventionAvailable(c)) {
     const p = c.openingPrevention;
-    if (p?.outcome?.acknowledged) return hint("prevention-recorded", "Prevention was recorded. Its verification and Opening recognition are required before continuing.", "Review Chapter requirements and complete the Opening recognition when it is available.", "requirements");
+    if (p?.outcome?.acknowledged) return hint("prevention-recorded", "Prevention was recorded. Its verification and Opening recognition are required before continuing.", "Review the chapter requirements and complete the Opening recognition when it is available.", "requirements");
     const req = preventionRequirements(c);
     if (Object.values(req).every(Boolean)) return run("prevention-stability", `Full-demand service qualifies. Fresh prevention observations: ${p?.stableSteps ?? 0} / 5.`);
     return hint("prevention-inspection", "Opening prevention requires recorded inspections and healthy full-demand service.", !req.applicationInspected ? "Open App Server to inspect the current application." : !req.databaseInspected ? "Open Database to inspect the current workload." : "Open Network to compare admitted and rejected traffic with full-demand requirements.", !req.applicationInspected ? "app" : !req.databaseInspected ? "db" : "network");
   }
-  return hint("requirements", "There is no confidently identified next time-dependent requirement.", "Use View chapters to review the journey, and compare Chapter requirements with the latest readings before choosing a response.", "requirements");
+  return hint("requirements", "There is no confidently identified next time-dependent requirement.", "Use View chapters to review the journey, and compare the chapter requirements with the latest readings before choosing a response.", "requirements");
 }

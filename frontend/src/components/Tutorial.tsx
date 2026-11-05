@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
 import { useCampaignAttention } from "./useCampaignAttention";
@@ -41,6 +41,8 @@ interface Step {
   inTech?: boolean;
   /** A one-card guide the player follows by opening equipment: inspecting any of it completes the card. */
   endsOnInspection?: boolean;
+  /** A step the player finishes in several clicks: how many, and which one is next. Each click gets its own box. */
+  clicks?: { count: number; at: (s: Snapshot) => number };
 }
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
@@ -120,6 +122,10 @@ const DEPLOY_CHECKS = '.component-inspection [data-tour="deploy-checks"]';
 const MONITORING_DETAILS = ".component-inspection-monitoring [data-inspection-details]";
 const checksStep = (s: Snapshot) =>
   s.roomInspection?.equipment !== "monitoring" ? "inspect" : document.querySelector(DEPLOY_CHECKS) ? "deploy" : "details";
+/** Unlock Health Checks: open Tech, select Health Checks, unlock it. */
+const unlockClick = (s: Snapshot) => (s.view !== "tech" ? 0 : s.techFocus !== "health_checks" ? 1 : 2);
+/** Deploy Health Checks: close Tech, open Monitoring, inspect its details, deploy, confirm. */
+const deployClick = (s: Snapshot) => (s.view === "tech" ? 0 : confirmingChecks() ? 4 : { inspect: 1, details: 2, deploy: 3 }[checksStep(s)]);
 const CHAPTERS = {
   scaling: chapter(
     "Scale and route",
@@ -144,14 +150,13 @@ const CHAPTERS = {
       "Stay online",
       "The test makes one App Server fail. Manual and automatic responses are available.",
       "Explore the reliability controls on Monitoring, App Server and Network before starting the test.",
-      '.campaign-panel [aria-label="Chapter Progress"]',
+      '.campaign-panel [aria-label="Guided Mode requirements"]',
     ),
     {
       title: "Unlock Health Checks",
       why: "This chapter's capabilities are unlocked in Tech with research points.",
-      hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "health_checks" ? "Click Health Checks." : "Press Unlock Health Checks."),
-      target: (s) =>
-        s.view !== "tech" ? TECH_TAB : s.techFocus !== "health_checks" ? '.node[data-tech="health_checks"]' : `.tree-detail ${PRIMARY}`,
+      hint: (s) => ["Open Tech.", "Click Health Checks.", "Press Unlock Health Checks."][unlockClick(s)],
+      target: (s) => [TECH_TAB, '.node[data-tech="health_checks"]', `.tree-detail ${PRIMARY}`][unlockClick(s)],
       inTech: true,
       done: (s) => !!s.game.campaign?.reliabilityStage?.owned.includes("health_checks"),
     },
@@ -159,24 +164,16 @@ const CHAPTERS = {
       title: "Deploy Health Checks",
       why: "Unlocking does not deploy it.",
       hint: (s) =>
-        s.view === "tech"
-          ? "Close Tech."
-          : confirmingChecks()
-            ? "Press Confirm."
-            : checksStep(s) === "inspect"
-              ? "Click Monitoring."
-              : checksStep(s) === "details"
-                ? "Press the Monitoring disc to inspect details."
-                : s.game.campaign && installPending(s.game.campaign)
-                  ? "Run until the current install finishes, then press Deploy Health Checks."
-                  : "Press Deploy Health Checks.",
+        [
+          "Close Tech.",
+          "Click Monitoring.",
+          "Press the Monitoring disc to inspect details.",
+          s.game.campaign && installPending(s.game.campaign) ? "Run until the current install finishes, then press Deploy Health Checks." : "Press Deploy Health Checks.",
+          "Press Confirm.",
+        ][deployClick(s)],
       // The confirmation opens over the inspection; light it up rather than leaving it under the dim.
-      target: (s) =>
-        s.view === "tech"
-          ? TECH_TAB
-          : confirmingChecks()
-            ? ".component-purchase, .campaign-action-popover"
-            : { inspect: shortcut("monitoring"), details: MONITORING_DETAILS, deploy: DEPLOY_CHECKS }[checksStep(s)],
+      target: (s) => [TECH_TAB, shortcut("monitoring"), MONITORING_DETAILS, DEPLOY_CHECKS, ".component-purchase, .campaign-action-popover"][deployClick(s)],
+      clicks: { count: 5, at: deployClick },
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;
@@ -226,6 +223,23 @@ function closedDockMenu(el: Element): { summary: HTMLElement; name: string } | n
   return menu?.dataset.menuName && summary && !summary.contains(el) ? { summary, name: menu.dataset.menuName } : null;
 }
 
+/**
+ * VoiceOver ignores a live region outside an open aria-modal dialog, such as the inspection a step's control lives
+ * in, so the open one is given the region to own before it speaks (as Angular CDK's LiveAnnouncer does). The region
+ * stays where it is in the page, so it is never re-created with its message already in it. An element has one owner,
+ * so where dialogs are nested, such as a purchase preview inside its inspection, only the innermost owns it.
+ */
+function ownFromModals(id: string) {
+  const modals = [...document.querySelectorAll('[aria-modal="true"]')];
+  modals.forEach((modal, i) => {
+    const owns = modal.getAttribute("aria-owns")?.split(/\s+/).filter(Boolean) ?? [];
+    const others = owns.filter(o => o !== id), next = i === modals.length - 1 ? [...others, id] : others;
+    if (next.join(" ") === owns.join(" ")) return;
+    if (next.length) modal.setAttribute("aria-owns", next.join(" "));
+    else modal.removeAttribute("aria-owns");
+  });
+}
+
 export default function Tutorial() {
   return <SpotlightTutorial />;
 }
@@ -245,6 +259,10 @@ function SpotlightTutorial() {
   const card = useRef<HTMLDivElement>(null);
   /** The inspection already open when the step began, which does not count as following it. */
   const inspectionAtStart = useRef<number | null>(null);
+  /** The polite announcement of a change within a step, and the step and position it was last told for. */
+  const [announcement, setAnnouncement] = useState("");
+  const heard = useRef<{ step: string; position: string } | null>(null);
+  const liveId = useId();
   // Steps can wait on an action's confirmation, which lives outside the store.
   useSyncExternalStore(subscribeConfirming, confirmingAction);
 
@@ -372,46 +390,85 @@ function SpotlightTutorial() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, index]);
 
-  if (!visible || !step || !tour) return null;
+  const current = visible && step ? step : undefined;
+  const name = (track && TRACK_NAMES[track]) ?? "Chapter guide";
+  // One box per click, so a step taken in several clicks fills several boxes.
+  const clicks = (x: Step) => x.clicks?.count ?? 1;
+  const total = steps.reduce((n, x) => n + clicks(x), 0);
+  const now = current ? steps.slice(0, index).reduce((n, x) => n + clicks(x), 0) + (current.clicks?.at(s) ?? 0) : 0;
+  const hint = current?.hint(s) ?? "";
+  const prompt = menu ? `Open ${menu}, then ${lowerFirst(hint)}` : hint;
+  // Where the player is within the step: its box and what to click. The folded-menu prefix is measured a moment after
+  // the target changes, so it is left out rather than heard as a change of its own. A step that is already done is
+  // about to give way to the next one, so its passing state is not a position worth announcing.
+  const position = current && !current.done?.(s) ? `${now}:${hint}` : null;
+  const told = `${name}, step ${now + 1} of ${total}: ${prompt}`;
+  const stepKey = `${track}:${index}`;
+  useEffect(() => {
+    // Hidden, the guide says nothing; it remembers where it was, so showing it again unchanged stays quiet.
+    if (position === null) {
+      setAnnouncement("");
+      return;
+    }
+    const last = heard.current;
+    heard.current = { step: stepKey, position };
+    // A new step moves focus to the card, which reads its name: announcing it too would say it twice. Only a change
+    // within the step, made while the player's focus is on the game rather than the card, is announced.
+    const changed = last?.step === stepKey && last.position !== position;
+    if (changed) ownFromModals(liveId);
+    setAnnouncement(changed ? told : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position, stepKey]);
 
-  const waiting = !!step.done;
-  const name = TRACK_NAMES[tour.track] ?? "Chapter guide";
-  const why = typeof step.why === "function" ? step.why(s) : step.why;
+  // The live region stays in the page, empty, whether or not the card shows, so screen readers notice what fills it.
+  const live = (
+    <p id={liveId} className="visually-hidden" role="status" aria-live="polite">
+      {announcement}
+    </p>
+  );
+  // The empty slot keeps the live region in the same place in the tree, so hiding the card never replaces it.
+  if (!current || !tour) return <>{null}{live}</>;
+
+  const waiting = !!current.done;
+  const why = typeof current.why === "function" ? current.why(s) : current.why;
   const campaign = !!s.game.campaign;
   // A phone docks every guide in its coach strip above the dock (see the phone's tutorial styles).
   const docked = isPhoneEdition();
   // The fixed-height strip scrolls under its Skip and Next, so what to do comes before the reason, as in Guided Mode.
   const whyFirst = !campaign && !docked;
   return (
-    <Spotlight box={box} track={tour.track} docked={docked}>
-      <div
-        ref={card}
-        className="tour-card"
-        role="dialog"
-        aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
-        tabIndex={-1}
-        style={docked ? undefined : cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
-      >
-        <div className="tour-dots" aria-hidden="true">
-          {steps.map((_, i) => (
-            <i key={i} className={i < tour.step ? "is-done" : i === tour.step ? "is-now" : ""} />
-          ))}
-        </div>
-        <h3>{step.title}</h3>
-        {whyFirst && why && <p className="muted">{why}</p>}
-        <p className="tour-prompt">{menu ? `Open ${menu}, then ${lowerFirst(step.hint(s))}` : step.hint(s)}</p>
-        {!whyFirst && why && <p className="muted tour-explanation">{why}</p>}
-        <div className="tour-foot">
-          <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
-            Skip
-          </button>
-          {!waiting && (
-            <button type="button" className="btn btn-primary btn-small" onClick={advance}>
-              {step.nextLabel ?? "Next"}
+    <>
+      <Spotlight box={box} track={tour.track} docked={docked}>
+        <div
+          ref={card}
+          className="tour-card"
+          role="dialog"
+          aria-label={`${name}, step ${now + 1} of ${total}`}
+          tabIndex={-1}
+          style={docked ? undefined : cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
+        >
+          <div className="tour-dots" aria-hidden="true">
+            {Array.from({ length: total }, (_, i) => (
+              <i key={i} className={i < now ? "is-done" : i === now ? "is-now" : ""} />
+            ))}
+          </div>
+          <h3>{current.title}</h3>
+          {whyFirst && why && <p className="muted">{why}</p>}
+          <p className="tour-prompt">{prompt}</p>
+          {!whyFirst && why && <p className="muted tour-explanation">{why}</p>}
+          <div className="tour-foot">
+            <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
+              Skip
             </button>
-          )}
+            {!waiting && (
+              <button type="button" className="btn btn-primary btn-small" onClick={advance}>
+                {current.nextLabel ?? "Next"}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </Spotlight>
+      </Spotlight>
+      {live}
+    </>
   );
 }
