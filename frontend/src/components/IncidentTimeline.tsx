@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { flushSync } from "react-dom";
 import type { EventKind } from "@/sim";
 import type { Snapshot, TraceEvent } from "@/sim/campaignTypes";
 import type { ReportEvent } from "@/game/reportEvents";
@@ -76,15 +77,15 @@ export function IncidentTimeline({ snapshots, events, trace, openedStep, recover
 }) {
   const drawing = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(640);
+  // Resize observers report after layout and before the frame is painted, and the new width is drawn right there, so
+  // the frame that opens the technical details, or resizes the report, is drawn at the plot's width, not scaled to it.
   useLayoutEffect(() => {
     const el = drawing.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => { const fits = Math.floor(entry.contentRect.width); if (fits > 0) setWidth(fits); });
+    const observer = new ResizeObserver(([entry]) => { const fits = Math.floor(entry.contentRect.width); if (fits > 0) flushSync(() => setWidth(fits)); });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  // Measured again as the technical details open, so their first frame is drawn at the plot's width, not scaled to it.
-  useLayoutEffect(() => { const fits = Math.floor(drawing.current?.getBoundingClientRect().width ?? 0); if (fits > 0) setWidth(fits); }, [focusable]);
   // The selection moves between seconds that have readings; it opens on the worst one.
   const [selected, setSelected] = useState(() => snapshots.reduce((worst, m, i) => (severity(m) > severity(snapshots[worst]) ? i : worst), 0));
   const current = snapshots[Math.min(selected, snapshots.length - 1)];

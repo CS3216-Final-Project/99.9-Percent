@@ -155,3 +155,27 @@ for (const [width, height] of [[1440, 900], [320, 640]]) test(`a burst of events
   await slider.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath(`crowded-${width}.png`) });
 });
+
+// On a desktop the closed details lay the plot out narrower than it opens; on a phone the widths match.
+test("the first frame after the technical details open is drawn at the plot's width", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, slowResponse()); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
+  // Resize observers run after layout, just before a frame is painted, in the order they were made: one made after the
+  // timeline's own reads the drawing each frame paints, from the frame the plot first has its open width.
+  await report.locator(".timeline-plot svg").evaluate(svg => {
+    const paints: { drawn: number; laid: number }[] = [];
+    (window as unknown as { paints: typeof paints }).paints = paints;
+    new ResizeObserver(() => paints.push({ drawn: (svg as SVGSVGElement).viewBox.baseVal.width, laid: svg.getBoundingClientRect().width })).observe(svg);
+  });
+  // The click lands just before a frame, so the frame is laid out and painted before the details' toggle event.
+  await report.locator("summary", { hasText: "View Technical Details" }).evaluate(summary => requestAnimationFrame(() => (summary as HTMLElement).click()));
+  await expect(report.getByRole("slider", { name: "Incident timeline, game second", exact: true })).toBeVisible();
+  await report.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+  const paints = await page.evaluate(() => (window as unknown as { paints: { drawn: number; laid: number }[] }).paints);
+  const open = paints.at(-1)!.laid;
+  expect(open).toBeGreaterThan(200);
+  for (const p of paints.filter(p => p.laid === open)) expect(p.drawn, JSON.stringify(paints)).toBe(Math.floor(open));
+});
