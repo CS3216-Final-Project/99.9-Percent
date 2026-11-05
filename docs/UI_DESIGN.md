@@ -91,12 +91,12 @@ Apply this system to both modes and every surface: title and account, HUD and ch
 | Primary decision | Plum fill, cream label and icon; darker fill while pressed. Use for Resume, Run, start and confirmation actions. |
 | Secondary action | Cream fill and a thin warm edge; warmer fill on hover and press. |
 | Selected / toggled | Lavender fill and plum edge, plus the existing selected, pressed or checked semantics. Radio choices retain a filled marker; status and selection never depend on colour alone. |
-| Destructive action | Red treatment with an explicit action label and the existing confirmation. |
+| Destructive action | `--critical-ink` fill, lighter on hover (`--danger-hover`) and darker while pressed (`--danger-active`), with a white label at least 4.5:1 in every state, an explicit action label and the existing confirmation. |
 | Keyboard focus | Visible blue 3 px outline with an offset; do not replace it with a shadow or remove it on dark surfaces. |
 | Disabled / unavailable | Readable muted text, no movement, and the existing explanation of the requirement or cost. |
 | Loading / result | Reserve the control footprint across every label, count and icon change. |
 
-Use `--control-edge`, `--control-inset`, `--control-hover`, `--control-active`, `--selection`, `--selection-edge`, `--primary-hover` and `--primary-active` from `index.css`. `--press` is `none`; `--lift` is a diffuse overlay shadow. Do not add a local palette to solve an individual component. Keep layout transforms, room animations, focus indicators and equipment-targeting rings independent from button decoration.
+Use `--control-edge`, `--control-inset`, `--control-hover`, `--control-active`, `--selection`, `--selection-edge`, `--primary-hover`, `--primary-active`, `--danger-hover` and `--danger-active` from `index.css`. `--press` is `none`; `--lift` is a diffuse overlay shadow. Do not add a local palette to solve an individual component. Keep layout transforms, room animations, focus indicators and equipment-targeting rings independent from button decoration.
 
 ### Usability review
 
@@ -170,15 +170,17 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Escape closes a menu and returns focus to its trigger; clicking outside closes it.
   Reserve control dimensions across states and counts.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.
-  Outcome reports and postmortems read as a chat: the colleague who introduced the report's chapter (Maya for Launch Week and the Opening, then Alex, Jordan, Sam and Taylor) asks each question in a dark bubble on the right, and the player, who ran the company through it, answers in a paper bubble on the left.
-  No bubble, with the room kept for its speaker's picture, is wider than 75% of the report, and a capacity summary's heading is a question and its readings table and story are answers.
+  Outcome reports, postmortems and a failed spike test's debrief read as a chat: the colleague who introduced the report's chapter (Maya for Launch Week and the Opening, then Alex, Jordan, Sam and Taylor) asks each question in a dark bubble on the right, and the player, who ran the company through it, answers in a paper bubble on the left.
+  Wider than 480 px, no bubble, with the room kept for its speaker's picture, is wider than 75% of the report; on a phone a bubble reaches only as far as the other speaker's picture, and the pictures are smaller.
+  A capacity summary's heading is a question and its readings table and story are answers; a reading that cannot share a line with its label drops below it.
+  A chat without speakers keeps no picture gutters.
   A small round picture of the speaker sits beside the bottom of each bubble on its outer side: the colleague's portrait for questions and the player's current avatar for answers, shown once at the end of a run of answers.
   An incident report keeps the colleague of the chapter it happened in, even when read later from History.
   A report's lone action, such as Continue company, sits on the right.
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
   An incident postmortem's View Technical Details opens on its recovery summary and then an Incident timeline: lanes on one game-second axis for demand against capacity (App Servers and Database, demand solid and capacity dashed), response time against the 500 ms limit and service errors against the 1% limit, with the incident window shaded through every lane and a faint line where each change took effect.
   Recorded events are numbered markers on the timeline's bottom track, keyed in the list beneath it in the same colours as History's event feed.
-  The timeline opens on the slowest second and writes that second's readings above the plot; the pointer, a tap, the arrow keys, Page Up and Down, Home and End move it, and the selected second's events are highlighted in the key.
+  The timeline opens on its worst second, the one furthest past the 500 ms or 1% limit, and writes that second's readings above the plot; the pointer, a tap, the arrow keys, Page Up and Down, Home and End move it, and the selected second's events are highlighted in the key.
   It is a slider for assistive technology, with the readings as its value, and every second's figures, routes and servers stay in a table that screen readers read but the page does not draw.
   The causes list and, in Data Strategy, the workload and cache table follow the timeline.
   Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.

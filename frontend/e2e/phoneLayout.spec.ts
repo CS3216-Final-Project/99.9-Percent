@@ -3,7 +3,8 @@ import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { act, reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
-import { expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
+import { advanceCampaignStep, expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
+import { finishingScaling } from "../src/sim/__tests__/dataFixture";
 
 /*
  * The phone edition's layout regions on a touch phone (Pixel 7): the top strip, the System metrics sheet, the dock
@@ -322,4 +323,22 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) t
   await expect(target).toBeInViewport({ ratio: 1 });
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: info.outputPath(`hint-phone-${size.width}.png`) });
+});
+
+for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) test(`Guided Mode complete on a ${size.width}px phone: a company that cannot be saved is announced before it is lost`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock();
+  await openGuided(page, size, finishingScaling());
+  await advanceCampaignStep(page, { resumeClock: false });
+  const done = page.getByRole("dialog", { name: "Phone campaign complete", exact: true });
+  await expect(done).toBeVisible();
+  // The browser's storage fills up after the finished chapter was saved.
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
+  await done.getByRole("button", { name: "Play Challenge Mode", exact: true }).tap();
+  const lose = done.getByRole("button", { name: "Switch and lose this company", exact: true });
+  await expect(done.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
+  await expect(lose).toBeInViewport({ ratio: 1 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: info.outputPath(`phone-complete-unsaved-${size.width}.png`) });
+  await lose.tap();
+  await expect(done).toHaveCount(0);
 });

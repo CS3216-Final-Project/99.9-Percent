@@ -97,9 +97,34 @@ it("asks before losing a finished company that cannot be saved, then switches wh
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
   expect(useGame.getState().mode).toBe("campaign");
-  expect(scorecard()!.textContent).toContain("This company could not be saved");
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
   fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
   expect(useGame.getState().mode).toBe("classic");
+});
+
+it("does not switch on a held Enter that carried on from the finale", () => {
+  show(); useGame.setState({ hasRun: true });
+  while (next()) fireEvent.click(next()!);
+  fireEvent.click(within(finale()!).getByRole("button", { name: "See the scorecard" }));
+  const go = within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" });
+  expect(document.activeElement).toBe(go);
+  // A repeated key is cancelled before it can activate the button; a new press still does.
+  expect(fireEvent.keyDown(go, { key: "Enter", repeat: true })).toBe(false);
+  expect(fireEvent.keyDown(go, { key: "Enter" })).toBe(true);
+});
+
+it("drops the warning when a cloud action refuses the switch instead of the save", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  useGame.setState({ cloudBusy: true });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
+  expect(scorecard()!.textContent).not.toContain("could not be saved");
+  // Once the cloud action is over, the switch tries to save again rather than discarding the company unasked.
+  useGame.setState({ cloudBusy: false }); setItem.mockRestore();
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
 });
 
 it("waits out a cloud action without claiming the finished company could not be saved", () => {

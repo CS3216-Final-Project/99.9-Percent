@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 
@@ -56,6 +56,69 @@ async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
 
 test("campaign finale: every colleague celebrates, then the scorecard, and it never replays", async ({ page }, info) => {
   await finaleJourney(page, info, false);
+});
+
+/** Plays the stored company to its finale, with the room stubbed: these journeys are about the dialogs. */
+async function openFinale(page: Page) {
+  await page.route("**/api/**", r => r.abort()); await seedSave(page, reliabilityOutcome()); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("dialog", { name: "Reliability outcome", exact: true }).getByRole("button", { name: "Complete campaign", exact: true }).click();
+  const scene = page.getByRole("dialog", { name: "Campaign finale", exact: true });
+  await expect(scene).toBeVisible();
+  return { scene, scorecard: page.getByRole("dialog", { name: "Campaign complete", exact: true }) };
+}
+
+test("campaign finale: Enter held on its last line opens the scorecard without leaving Guided Mode", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const { scene, scorecard } = await openFinale(page);
+  for (let line = 1; line < CAST.length; line++) await page.keyboard.press("Enter");
+  await expect(scene.getByRole("button", { name: "See the scorecard", exact: true })).toBeFocused();
+  // Holding the key repeats it on whatever has focus by then: the scorecard's Continue to Challenge Mode.
+  for (let repeat = 0; repeat < 4; repeat++) await page.keyboard.down("Enter");
+  await page.keyboard.up("Enter");
+  await expect(scene).toHaveCount(0); await expect(scorecard).toBeVisible();
+  await expect(scorecard.getByRole("button", { name: "Continue to Challenge Mode", exact: true })).toBeFocused();
+  expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).not.toBe("classic");
+  // A fresh press is the player's choice and still carries on.
+  await page.keyboard.press("Enter");
+  await expect(scorecard).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
+});
+
+/** WCAG contrast of an element's text on its own background, both opaque. */
+const contrast = (target: Locator) => target.evaluate(el => {
+  const luminance = (rgb: string) => {
+    const [r, g, b] = rgb.match(/\d+(\.\d+)?/g)!.slice(0, 3).map(v => Number(v) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const style = getComputedStyle(el), [a, b] = [luminance(style.color), luminance(style.backgroundColor)].sort((x, y) => y - x);
+  return (a + 0.05) / (b + 0.05);
+});
+
+for (const size of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 568 }]) test(`campaign complete at ${size.width}px: a company that cannot be saved is announced, keeps its actions in view and asks before it is lost`, async ({ page, withoutRoom }, info) => {
+  await withoutRoom(); await page.setViewportSize(size); await page.emulateMedia({ reducedMotion: "reduce" });
+  const { scene, scorecard } = await openFinale(page);
+  await scene.getByRole("button", { name: "Skip to the scorecard", exact: true }).click();
+  // The browser's storage fills up after the finished company was saved.
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException("Full", "QuotaExceededError"); }; });
+  await scorecard.getByRole("button", { name: "Continue to Challenge Mode", exact: true }).click();
+  const lose = scorecard.getByRole("button", { name: "Switch and lose this company", exact: true });
+  await expect(scorecard.getByRole("alert").filter({ hasText: "This company could not be saved" })).toBeVisible();
+  const actions = scorecard.locator(".campaign-complete-foot > .btn");
+  await expect(actions).toHaveCount(3);
+  for (const action of await actions.all()) await expect(action).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(size.width);
+  // The pointer that pressed it is still over the red button: its white label stays readable hovered, at rest and pressed.
+  const { x, y, width, height } = (await lose.boundingBox())!;
+  await page.mouse.move(x + width / 2, y + height / 2);
+  expect(await contrast(lose)).toBeGreaterThanOrEqual(4.5);
+  await page.screenshot({ path: info.outputPath(`campaign-complete-unsaved-${size.width}.png`) });
+  await page.mouse.down(); expect(await contrast(lose)).toBeGreaterThanOrEqual(4.5);
+  await page.mouse.move(0, 0); await page.mouse.up(); expect(await contrast(lose)).toBeGreaterThanOrEqual(4.5);
+  await lose.click();
+  await expect(scorecard).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).not.toBe("classic");
+  await expect(page.getByRole("button", { name: "Skip", exact: true })).toBeVisible();
 });
 
 test.describe("on touch", () => {

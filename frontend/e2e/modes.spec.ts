@@ -75,7 +75,7 @@ test("asks before switching away from a run that cannot be saved", async ({ page
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("button", { name: "Switch to Challenge Mode" }).click();
-  await expect(menu).toContainText("This run could not be saved");
+  await expect(menu.getByRole("alert").filter({ hasText: "This run could not be saved" })).toBeVisible();
   await menu.getByRole("button", { name: "Switch and lose this run" }).click();
   await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");

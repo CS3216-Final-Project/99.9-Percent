@@ -57,7 +57,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
         </div>
       )}
       {unsaved && !locked && (
-        <Callout compact tone="warn" icon="alert" kicker="Not saved">
+        <Callout compact tone="warn" icon="alert" kicker="Not saved" live="alert">
           This run could not be saved, so switching now loses it. Press "Switch and lose this run" again to switch anyway.
         </Callout>
       )}

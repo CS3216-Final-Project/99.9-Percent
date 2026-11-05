@@ -96,6 +96,20 @@ describe("phone edition", () => {
     expect(useGame.getState().mode).toBe("classic");
   });
 
+  it("announces a completed phone company that cannot be saved before losing it", async () => {
+    await renderPhone();
+    act(() => useGame.setState({ game: finishingScaling(), hasRun: true, started: true, onboarding: false, running: true, meta: { ...useGame.getState().meta, tutorialDone: true } }));
+    act(() => useGame.getState().advance());
+    const done = screen.getByRole("dialog", { name: "Phone campaign complete" });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+    fireEvent.click(within(done).getByRole("button", { name: "Play Challenge Mode" }));
+    expect(within(done).getByRole("alert").textContent).toContain("This company could not be saved");
+    fireEvent.click(within(done).getByRole("button", { name: "Switch and lose this company" }));
+    setItem.mockRestore();
+    expect(useGame.getState().mode).toBe("classic");
+    expect(screen.queryByRole("dialog", { name: "Phone campaign complete" })).toBeNull();
+  });
+
   it("keeps a Challenge Mode company going past its Series A with no deadline in the dock or menu", async () => {
     const won = runBot(BALANCE.introSeed, balanced, "expert").state;
     saveMeta({ ...DEFAULT_META, challengeUnlocked: true });

@@ -3780,6 +3780,12 @@ button:disabled {
   flex-basis: 100%;
 }
 
+/* The unsaved warning keeps its own room between the scrolling report and the actions. */
+.campaign-recovery-report .modal-body > .callout {
+  flex: none;
+  margin-top: 12px;
+}
+
 .modal-body h4 {
   margin-top: 18px;
 }
