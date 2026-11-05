@@ -66,10 +66,13 @@ it("plots the evidence window as a timeline whose selected second reads out ever
   const from = reportWindowStart(r), window = r.snapshots.filter(m => m.step >= from);
   const timeline = within(screen.getByRole("region", { name: "Incident timeline" }));
   const slider = timeline.getByRole("slider", { name: "Incident timeline, game second" });
-  // It opens on the slowest second, the one that shows the incident at its worst.
-  const worst = window.reduce((a, m) => (m.latencyMs > a.latencyMs ? m : a));
+  // It opens on the worst second, the one furthest past a limit: here the slowest second that also failed requests.
+  const worst = window.reduce((a, m) => (m.latencyMs > a.latencyMs || m.latencyMs === a.latencyMs && (m.serviceErrorRate ?? 0) > (a.serviceErrorRate ?? 0) ? m : a));
+  expect(worst.serviceErrorRate).toBeGreaterThan(0.01);
   expect(slider.getAttribute("aria-valuenow")).toBe(String(worst.step));
-  expect(slider.getAttribute("aria-valuetext")).toContain(`Game second ${worst.step}: response time ${Math.round(worst.latencyMs).toLocaleString("en-US")} ms`);
+  // Screen readers hear one sentence, with the servers' names capitalised as everywhere else.
+  expect(slider.getAttribute("aria-valuetext")).toBe(`Game second ${worst.step}: response time ${Math.round(worst.latencyMs).toLocaleString("en-US")} ms, service errors ${(worst.serviceErrorRate! * 100).toFixed(2)}%, `
+    + `App Servers ${worst.app.demand.toLocaleString("en-US")} of ${worst.app.capacity.toLocaleString("en-US")} req/s, Database ${worst.db.demand.toLocaleString("en-US")} of ${worst.db.capacity.toLocaleString("en-US")} ops/s`);
   expect(slider.getAttribute("aria-valuemin")).toBe(String(window[0].step));
   fireEvent.keyDown(slider, { key: "Home" });
   expect(slider.getAttribute("aria-valuenow")).toBe(String(window[0].step));
@@ -84,6 +87,17 @@ it("plots the evidence window as a timeline whose selected second reads out ever
   fireEvent.keyDown(slider, { key: "End" });
   expect(slider.getAttribute("aria-valuenow")).toBe(String(window.at(-1)!.step));
   expect(opened.hasAttribute("data-current")).toBe(false);
+});
+it("opens a failure whose response time stays flat on a second that failed requests, not on a calm one", () => {
+  const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
+  const r = structuredClone(c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!), window = r.snapshots.filter(m => m.step >= reportWindowStart(r));
+  window[0].serviceErrorRate = 0;
+  expect(new Set(window.map(m => m.latencyMs)).size).toBe(1);
+  render(<CampaignIncidentReport report={r} />); fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  const slider = screen.getByRole("slider", { name: "Incident timeline, game second" });
+  const opened = window.find(m => String(m.step) === slider.getAttribute("aria-valuenow"))!;
+  expect(opened.serviceErrorRate).toBe(Math.max(...window.map(m => m.serviceErrorRate ?? 0)));
+  expect(opened.serviceErrorRate).toBeGreaterThan(0.01);
 });
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
