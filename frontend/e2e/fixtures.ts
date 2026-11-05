@@ -12,7 +12,11 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
   // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
   reviewCompanyMessage: [true, { option: true }],
   companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
-    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).click());
+    // The message opens while the room compiles its shaders in software WebGL, when drawn frames arrive seconds apart.
+    // A click first waits for the button to hold still over frames after the dialogue's entrance animation, which spent
+    // much of the budget of the check that met the message (expectRoom). Enter on the focused Dismiss button activates
+    // it as a keyboard player would, with no frames to wait for; companyMessages.ts presses it by pointer.
+    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).press('Enter'));
     await use();
   }, { auto: true }],
   // The colleagues' celebration before the final scorecard; campaignFinale.spec.ts opts out to play it.
