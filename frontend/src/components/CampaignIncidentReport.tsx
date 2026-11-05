@@ -10,6 +10,8 @@ import { describeEvents, reportWindowStart, windowSpending } from "@/game/report
 import "./CampaignIncidentReport.css";
 import { serverName } from "@/sim";
 import { IncidentTimeline } from "./IncidentTimeline";
+import { useGame } from "@/game/store";
+import { chapterAt } from "@/game/chapterCompanyMessage";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c / 100);
 
@@ -55,7 +57,12 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
   // Workload readings repeat every second; show one only when the reading changes.
   const workload = snapshots.filter((m, i) => m.data && JSON.stringify(m.data) !== JSON.stringify(snapshots[i - 1]?.data ?? null));
   const events = describeEvents(report.events).filter(e => e.step >= from && e.step <= report.recoveredStep);
-  const eventList = events.length ? <ol className="report-events">{events.map(e => <li key={e.id}><span className="report-event-step">{e.step}</span><span><b>{e.title}</b>{e.detail && <small>{e.detail}</small>}</span></li>)}</ol> : <p>No event history was retained.</p>;
+  const eventList = events.length ? <ol className="report-events" aria-label="Recorded events">{events.map(e => <li key={e.id}><span className="report-event-step">{e.step}</span><span><b>{e.title}</b>{e.detail && <small>{e.detail}</small>}</span></li>)}</ol> : <p>No event history was retained.</p>;
+  // The timeline sums capacity over healthy servers, which hides a failed one the route still feeds, so a Stay Online
+  // incident keeps its per-server table instead, whichever chapter it is read in.
+  const stayOnline = useGame(s => !!s.game.campaign && chapterAt(s.game.campaign, report.openedStep) === 5);
+  const timeline = !stayOnline && snapshots.length > 0;
+  const observations = <p>{report.snapshots.length ? "No observations were recorded in this window." : "No historical observations were retained."}</p>;
   return <>
     <dl className="rows report-metrics" aria-label="Recovery summary">
       <Row label="Incident window" value={`Game seconds ${report.openedStep}-${report.recoveredStep}`} />
@@ -63,8 +70,8 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
       <Row label="Traffic status" value={lesson.traffic} />
       {spent > 0 && <Row label="Spending in this evidence window" value={dollars(spent)} />}
     </dl>
-      {snapshots.length > 0 ? <IncidentTimeline snapshots={snapshots} events={events} trace={report.events} openedStep={report.openedStep} recoveredStep={report.recoveredStep} focusable={technicalOpen} />
-        : <><p>{report.snapshots.length ? "No observations were recorded in this window." : "No historical observations were retained."}</p><h4>What happened, second by second</h4>{eventList}</>}
+      {timeline ? <IncidentTimeline snapshots={snapshots} events={events} trace={report.events} openedStep={report.openedStep} recoveredStep={report.recoveredStep} focusable={technicalOpen} />
+        : !stayOnline && <>{observations}<h4>What happened, second by second</h4>{eventList}</>}
       <h4>Causes, actions and trade-offs</h4>
       {/* One finding per bullet, so the reasoning scans instead of reading as a wall of prose. */}
       <ul className="report-explanations">{report.explanations.map((text, i) => <li key={i}>{text}</li>)}</ul>
@@ -74,11 +81,12 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
         <table className="campaign-table"><caption>Workload and cache readings, shown when they change</caption><thead><tr><th scope="col">From game second</th><th scope="col">Workload</th><th scope="col">Requests of work</th><th scope="col">Cache hits / misses</th><th scope="col">Writes</th><th scope="col">Uncacheable reads</th><th scope="col">Warmth used / after</th><th scope="col">Hit rate (target)</th><th scope="col">Database read / write demand ops/s</th><th scope="col">Database: demand / capacity ops/s · queue</th></tr></thead>
           <tbody>{workload.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.data!.profile.replaceAll("-", " ")}</td><td>{num(m.data!.logical)}</td><td>{num(m.data!.hits)} / {num(m.data!.eligibleMisses)}</td><td>{num(m.data!.writes)}</td><td>{num(m.data!.nonCacheableReads)}</td><td>{m.data!.warmthUsed / 100}% / {m.data!.warmthAfterStep / 100}%</td><td>{m.data!.effectiveHitRateUsed / 100}% ({m.data!.target / 100}%)</td><td>{num(m.data!.databaseReadDemand)} / {num(m.data!.databaseWriteDemand)}</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td></tr>)}</tbody></table>
       </div>}
-      {/* The timeline draws these readings; screen readers get every second's figures, routes and servers here. */}
-      {snapshots.length > 0 && <div className="visually-hidden">
+      {/* Every second's figures, routes and servers: shown in Stay Online, and for screen readers beside a timeline that draws them. */}
+      {snapshots.length > 0 && <div {...timeline ? { className: "visually-hidden" } : { className: "report-table-scroll", tabIndex: technicalOpen ? 0 : undefined, role: "region", "aria-label": "Recorded incident evidence" }}>
         <table className="campaign-table"><caption>Recorded incident evidence by game second</caption><thead><tr><th scope="col">Game second</th><th scope="col">Applications: demand / capacity req/s · queue</th><th scope="col">Routing</th><th scope="col">Database: demand / capacity ops/s · queue</th><th scope="col">Latency</th><th scope="col">Service errors</th></tr></thead>
           <tbody>{snapshots.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.instances ? m.instances.map(a => <div key={a.id}>{serverName(a.id)}: {num(a.demand)} / {a.health === "failed" ? "0" : num(a.capacity)} · {num(a.backlog)}{a.health === "failed" ? " (failed)" : ""}</div>) : `${num(m.app.demand)} / ${num(m.app.capacity)} · ${num(m.app.backlog)} (all servers)`}</td><td>{m.routing ? `${m.routing.targets.map(serverName).join(", ")} (${m.routing.mode})` : "Not recorded"}</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td><td>{num(Math.round(m.latencyMs))} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
       </div>}
+      {stayOnline && <>{!snapshots.length && observations}<h4>What happened, second by second</h4>{eventList}</>}
   </>;
 }
 

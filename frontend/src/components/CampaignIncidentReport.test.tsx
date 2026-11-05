@@ -155,6 +155,33 @@ it("says the load balancer kept sending traffic to a failed server instead of cl
   expect(evidence.textContent).not.toMatch(/Server 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
 });
 
+it("shows a Stay Online incident as its per-server table and event list, and an earlier chapter's as the timeline, whichever chapter reads it", () => {
+  // The timeline sums capacity over healthy servers while the route still feeds the failed one; the table's
+  // per-server rows and Routing column show why the errors came.
+  const game = reliabilityOutcome(true), c = game.campaign!, f = c.reliabilityStage!.fault!;
+  const stay = c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!, opening = c.reports[0];
+  expect(opening.openedStep).toBeLessThan(c.reliabilityStage!.enteredStep);
+  useGame.setState({ game });
+  const view = render(<CampaignIncidentReport report={stay} />);
+  fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  expect(screen.queryByRole("slider")).toBeNull();
+  const region = screen.getByRole("region", { name: "Recorded incident evidence" });
+  expect(region.closest(".visually-hidden")).toBeNull();
+  const table = within(region).getByRole("table", { name: "Recorded incident evidence by game second" });
+  expect(table.textContent).toContain("Server 3: 800 / 0 · 0 (failed)");
+  expect(within(table).getByRole("columnheader", { name: "Routing" })).toBeTruthy();
+  const events = describeEvents(stay.events).filter(e => e.step >= reportWindowStart(stay) && e.step <= stay.recoveredStep);
+  expect(screen.getByRole("heading", { name: "What happened, second by second" })).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Recorded events" }).querySelectorAll("li")).toHaveLength(events.length);
+  view.unmount();
+  // The company's Opening incident, read from History in Stay Online, keeps its timeline.
+  render(<CampaignIncidentReport report={opening} />);
+  fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  expect(screen.getByRole("slider", { name: "Incident timeline, game second" })).toBeTruthy();
+  expect(screen.getByRole("table", { name: "Recorded incident evidence by game second" }).closest(".visually-hidden")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "What happened, second by second" })).toBeNull();
+});
+
 it.each([
   [{ toFailed: 800, stopped: { step: 21, by: "rerouted" as const, admitted: 2400, capacity: 3200 } }, "failed until it was taken out of the route at game second 21", "the errors came from the failed server staying in the route."],
   [{ toFailed: 800, stopped: { step: 21, by: "rerouted" as const, admitted: 2400, capacity: 1600 } }, "failed until it was taken out of the route at game second 21", "the healthy servers could serve 1,600 of the 2,400 req/s admitted, so they stayed overloaded"],

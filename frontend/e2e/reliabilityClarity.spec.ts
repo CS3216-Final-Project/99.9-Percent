@@ -33,8 +33,9 @@ test("game text is not selectable: dragging across a report highlights nothing",
   await expect(outcome).toBeVisible();
 });
 
-test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock }) => {
-  await installClock();
+test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock, withoutRoom }, info) => {
+  // The journey reads the report and History; the software-drawn room behind them only slows every frame.
+  await withoutRoom(); await installClock();
   const completed = reliabilityOutcome(), c = completed.campaign!, report = c.reports.at(-1)!;
   const game = replayCampaign(completed.seed, c.runId, c.inputs.filter(input => input.step < report.recoveredStep), report.recoveredStep, false, c.foundation);
   expect(game.phase).toBe("review");
@@ -72,10 +73,28 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   await expect(dialog.getByText("Incident window", { exact: true })).toBeHidden();
   await dialog.getByText("View Technical Details", { exact: true }).click();
   await expect(dialog.getByText("Incident window", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("slider", { name: "Incident timeline, game second", exact: true })).toBeVisible();
-  await expect(dialog.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeAttached();
+  // A Stay Online incident shows its per-second table, not the timeline: only the table's per-server rows and Routing
+  // column show that the route kept feeding the failed server.
+  await expect(dialog.getByRole("slider")).toHaveCount(0);
+  const evidence = dialog.getByRole("region", { name: "Recorded incident evidence", exact: true });
+  await expect(evidence.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
+  await expect(evidence.getByRole("columnheader", { name: "Routing", exact: true })).toBeVisible();
+  await expect(evidence.getByText("Server 3: 800 / 0 · 0 (failed)", { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "What happened, second by second", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("list", { name: "Recorded events", exact: true }).getByRole("listitem").first()).toBeVisible();
+  await evidence.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("stay-online-evidence.png") });
   await dialog.getByRole("button", { name: "Continue company", exact: true }).click();
   const after = await savedGame(page);
   expect(after.phase).toBe("management"); expect(after.campaign!.runId).toBe(c.runId);
   expect(after.campaign!.step).toBe(report.recoveredStep);
+  // The company's Opening incident, read from History during Stay Online, keeps its timeline.
+  const opening = game.campaign!.reports[0];
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await page.getByRole("tab", { name: "Incidents (2)", exact: true }).click();
+  await page.getByRole("button", { name: new RegExp(`Game seconds ${opening.openedStep}-${opening.recoveredStep}`) }).click();
+  const history = page.getByRole("region", { name: "Incident report", exact: true });
+  await history.getByText("View Technical Details", { exact: true }).click();
+  await expect(history.getByRole("slider", { name: "Incident timeline, game second", exact: true })).toBeVisible();
+  await expect(history.getByRole("region", { name: "Recorded incident evidence", exact: true })).toHaveCount(0);
 });
