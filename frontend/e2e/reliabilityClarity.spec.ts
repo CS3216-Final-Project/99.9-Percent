@@ -1,7 +1,7 @@
 import { test, expect, seedSave, savedGame, expectRoom } from "./fixtures";
 import { reliabilityClarity } from "./reliabilityClarity";
 import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
-import { replayCampaign } from "../src/sim";
+import { newGame, replayCampaign } from "../src/sim";
 test("Chapter 5 clarity: short outcome, retained details and explicit acknowledgement", async ({ page, installClock }, info) => {
   await installClock(); await reliabilityClarity(page, info);
 });
@@ -46,6 +46,38 @@ test("game text is not selectable: dragging across a report highlights nothing",
     expect(await page.evaluate(() => getSelection()?.toString())).toBe(id);
   }
   await page.screenshot({ path: info.outputPath("selection-seed.png") });
+});
+
+test("the playtest session ID stays selectable for a facilitator's bug report", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock();
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, newGame(1, "session-copy")); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu", exact: true });
+  await menu.getByRole("tab", { name: "Playtest", exact: true }).click();
+  await menu.getByText("Playtest observer notes", { exact: true }).click();
+  const notes = menu.getByText(/^Session: /);
+  await expect(notes).toBeVisible();
+  const id = /^Session: (\S+) · /.exec(await notes.textContent() ?? "")?.[1] ?? "";
+  expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  await notes.scrollIntoViewIfNeeded();
+  // Drag from the first character of the ID to its last, wherever the line draws it.
+  const box = await notes.evaluate((el, id) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const at = node.textContent!.indexOf(id);
+      if (at < 0) continue;
+      const range = document.createRange(); range.setStart(node, at); range.setEnd(node, at + id.length);
+      const r = range.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height };
+    }
+    return null;
+  }, id);
+  expect(box).not.toBeNull();
+  await page.evaluate(() => getSelection()?.removeAllRanges());
+  await page.mouse.move(box!.x + 1, box!.y + box!.height / 2); await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width - 1, box!.y + box!.height / 2, { steps: 2 }); await page.mouse.up();
+  expect(await page.evaluate(() => getSelection()?.toString())).toBe(id);
+  await notes.screenshot({ path: info.outputPath("session-id.png") });
 });
 
 test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock, withoutRoom }, info) => {

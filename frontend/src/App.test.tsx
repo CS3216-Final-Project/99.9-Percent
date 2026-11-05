@@ -251,6 +251,22 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expect(within(classicMenu).getByRole("region", { name: "Playtest data" })).toBeTruthy();
 });
 
+it("sets the playtest session and build IDs in selectable code, and leaves their placeholders as prose", () => {
+  vi.stubEnv("VITE_BUILD_ID", "playtest-2026-11-05");
+  try {
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    const menu = openMenu(); openTab(menu, "Playtest");
+    const notes = within(menu).getByText(/^Session:/, { selector: "p" });
+    const session = useGame.getState().measurement.session!.id;
+    expect([...notes.querySelectorAll("code")].map((code) => code.textContent)).toEqual([session, "playtest-2026-11-05"]);
+    expect(notes.textContent).toBe(`Session: ${session} · Build: playtest-2026-11-05`);
+    vi.unstubAllEnvs(); vi.stubEnv("VITE_BUILD_ID", "");
+    act(() => useGame.setState((s) => ({ measurement: { ...s.measurement, session: null } })));
+    expect(notes.querySelector("code")).toBeNull();
+    expect(notes.textContent).toBe("Session: Not started · Build: dev/unrecorded");
+  } finally { vi.unstubAllEnvs(); }
+});
+
 it("lands the bankrupt company's menu on Saves, where Export and New company are", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   act(() => useGame.setState((s) => ({ game: { ...s.game, phase: "ended" } })));

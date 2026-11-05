@@ -129,8 +129,8 @@ body {
 }
 
 /* The game reads as an app rather than a page: clicking, dragging and long-pressing through panels, dialogues and
-   the room never highlight their text. What a player types, and a seed or run ID they may want to copy (always in
-   code), stay selectable. */
+   the room never highlight their text. What a player types, and a seed, run, session or build ID they may want to
+   copy (always in code), stay selectable. */
 body {
   overflow: hidden;
   -webkit-user-select: none;
@@ -147,8 +147,14 @@ code {
   -webkit-touch-callout: default;
 }
 
-/* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. */
+/* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. The chip
+   moves to the next line whole rather than splitting an ID, and breaks only an ID wider than the line. Its line
+   height keeps a line holding a chip as tall as the lines around it. */
 code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
   padding: 1px 6px;
   font-weight: 600;
   background: var(--control-inset);

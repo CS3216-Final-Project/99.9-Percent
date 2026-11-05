@@ -513,7 +513,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <FeedbackButton inline />
         <div className="menu-actions"><button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={20} />Export playtest record</button></div>
         <details className="more"><summary>Playtest observer notes</summary>
-          <p>Session: {measurement.session?.id??"Not started"} · Build: {import.meta.env.VITE_BUILD_ID||"dev/unrecorded"}</p>
+          <p>Session: {measurement.session?.id?<code>{measurement.session.id}</code>:"Not started"} · Build: {import.meta.env.VITE_BUILD_ID?<code>{import.meta.env.VITE_BUILD_ID}</code>:"dev/unrecorded"}</p>
           <label>Participant source <select value={measurement.session?.source??"unspecified"} onChange={e=>useGame.getState().observer(e.target.value as "organic"|"recruited"|"unspecified")}><option value="unspecified">Unspecified</option><option value="recruited">Recruited</option><option value="organic">Organic</option></select></label>
           <label>Exact facilitator intervention <textarea value={intervention} onChange={e=>setIntervention(e.target.value)} /></label>
           <button className="btn" disabled={!intervention.trim()} onClick={()=>{useGame.getState().observer(measurement.session?.source??"unspecified",intervention);setIntervention("");}}>Record intervention</button>
