@@ -17,8 +17,7 @@ export function CampaignCompleteFoot({ focus = true }: { focus?: boolean }) {
     <div className="modal-foot campaign-complete-foot">
       <button className="btn" onClick={() => openView("guidance")}><Icon name="eyes" size={16} />Inspect final company</button>
       <button className="btn" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button>
-      {/* The scorecard opens on this button, so Enter still held from the finale or the home screen must not press it. */}
-      <button className={`btn ${losing ? "btn-danger" : "btn-primary"}`} data-autofocus={focus || undefined} onKeyDown={e => { if (e.repeat) e.preventDefault(); }} onClick={e => switchTo("classic", e.currentTarget)}>
+      <button className={`btn ${losing ? "btn-danger" : "btn-primary"}`} data-autofocus={focus || undefined} onClick={e => switchTo("classic", e.currentTarget)}>
         {losing ? "Switch and lose this company" : "Continue to Challenge Mode"}<Icon name="next" />
       </button>
     </div>

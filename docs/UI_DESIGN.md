@@ -199,6 +199,8 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Guided Mode's final scorecard opens after the finale focused on Continue to Challenge Mode.
   View run scorecard reopens a won run's scorecard as Company scorecard with the same three actions, where Inspect final company returns to the company as Close does, and it opens focused on Close because the player opened it to read.
   On phones its actions form an even grid, two columns with the primary action last (one column on the narrowest phones), and its five ratings share their row, so nothing wraps raggedly or runs past the card; cash of a million or more is rounded like the top bar's, and so are users from ten million.
+  A shared dialog ignores the repeats of an Enter or Space already held down when it opened, so holding Enter on See the scorecard or View run scorecard opens the scorecard once and leaves it open, rather than pressing Continue to Challenge Mode or Close.
+  A key pressed again inside the dialog acts as usual, and holding it there repeats as anywhere else.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).
   In Challenge Mode they sit below the top bar.
   The active view tab stays pressed; the title receives focus on entry and Back to room or Esc restores the opener (the visible Views summary when its phone menu has closed).

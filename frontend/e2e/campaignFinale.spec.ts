@@ -109,6 +109,36 @@ test("campaign complete: the scorecard reopened from the final company still con
   expect((await savedGame(page)).outcome).toBe("won");
 });
 
+test("campaign complete: Enter held on View run scorecard opens the scorecard once and leaves it open", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const { scene, scorecard } = await openFinale(page);
+  await scene.getByRole("button", { name: "Skip to the scorecard", exact: true }).click();
+  await scorecard.getByRole("button", { name: "Inspect final company", exact: true }).click();
+  const view = page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "View run scorecard", exact: true });
+  const reopened = page.getByRole("dialog", { name: "Company scorecard", exact: true });
+  // Count every time the dialog appears, and every keydown the browser delivers with whether it repeats.
+  await page.evaluate(() => {
+    const w = window as unknown as { opened: number; repeats: boolean[] };
+    w.opened = 0; w.repeats = [];
+    new MutationObserver(records => {
+      const card = '[role="dialog"][aria-label="Company scorecard"]';
+      for (const r of records) for (const n of r.addedNodes) if (n instanceof Element && (n.matches(card) || n.querySelector(card))) w.opened++;
+    }).observe(document.body, { childList: true, subtree: true });
+    addEventListener("keydown", e => { if (e.key === "Enter") w.repeats.push(e.repeat); }, true);
+  });
+  await view.focus();
+  for (let repeat = 0; repeat < 6; repeat++) await page.keyboard.down("Enter");
+  await page.keyboard.up("Enter");
+  expect(await page.evaluate(() => (window as unknown as { repeats: boolean[] }).repeats)).toEqual([false, true, true, true, true, true]);
+  // The repeats land on the dialog's Close: they must neither close it nor, through the restored focus, reopen it.
+  await expect(reopened).toBeVisible();
+  await expect(reopened.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { opened: number }).opened)).toBe(1);
+  // A fresh press is the player's choice and still closes it.
+  await page.keyboard.press("Enter");
+  await expect(reopened).toHaveCount(0); await expect(view).toBeFocused();
+});
+
 /** WCAG contrast of an element's text on its own background, both opaque. */
 const contrast = (target: Locator) => target.evaluate(el => {
   const luminance = (rgb: string) => {
