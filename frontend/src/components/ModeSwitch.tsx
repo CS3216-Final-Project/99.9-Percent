@@ -49,7 +49,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
           <button
             type="button"
             className={`btn ${unsaved ? "btn-danger" : ""}`}
-            onClick={() => switchTo(to)}
+            onClick={(e) => switchTo(to, e.currentTarget)}
           >
             <Icon name="switch" size={20} />
             {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
