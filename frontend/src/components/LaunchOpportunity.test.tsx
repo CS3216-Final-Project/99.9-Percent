@@ -26,7 +26,14 @@ it("keeps reviewing and declining read-only, then commits one explicit launch", 
   fireEvent.click(screen.getByRole("button", { name: "Review launch" }));
   fireEvent.click(screen.getByRole("button", { name: "Launch campaign" }));
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(screen.getByRole("progressbar", { name: "Launch countdown" }).getAttribute("aria-valuetext")).toContain("3 game seconds");
+  const countdown = screen.getByRole("progressbar", { name: "Launch countdown" });
+  expect(countdown.getAttribute("aria-valuetext")).toContain("3 game seconds. Paused.");
+  expect(document.activeElement).toBe(countdown);
+  act(() => useGame.getState().setRunning(true));
+  expect(countdown.getAttribute("aria-valuetext")).toContain("Running.");
+  expect(countdown.textContent).toContain("3s to launch");
+  act(() => useGame.getState().setRunning(false));
+  expect(countdown.textContent).toContain("Paused · 3s left");
   expect(useGame.getState().game.campaign!.inputs.filter(i => i.action.type === "launch_scaling")).toHaveLength(1);
   act(() => useGame.getState().stepSeconds(2));
   expect(useGame.getState().game.campaign!.incomingRate).toBe(800);
