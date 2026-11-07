@@ -168,10 +168,6 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   // Continue company is the dialog's only action and sits on the right.
   const foot = await dialog.locator(".modal-foot").boundingBox(), go = await dialog.getByRole("button", { name: "Continue company", exact: true }).boundingBox();
   expect(Math.round(foot!.x + foot!.width - (go!.x + go!.width))).toBe(0);
-  // The rest reads the evidence, not the motion. The disclosure slides open on a CSS transition, and until a frame
-  // runs it its contents stay content-visibility hidden; on CI the software-drawn room behind the dialog has held off
-  // frames for 9 s. Reduced motion opens it at once.
-  await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(dialog.getByText("Incident window", { exact: true })).toBeHidden();
   await dialog.getByText("View Technical Details", { exact: true }).click();
   await expect(dialog.getByText("Incident window", { exact: true })).toBeVisible();

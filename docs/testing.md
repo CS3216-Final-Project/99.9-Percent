@@ -52,6 +52,11 @@ Browser contexts are isolated. Advanced scenarios use engine-generated states in
 
 Journeys that need exact game seconds opt in with the `installClock` fixture before navigation. `advanceCampaignStep(page, { seconds })` runs that many seconds through Run/Pause; use `resumeClock: false` when the caller deliberately keeps virtual time frozen. Scene, walking and audio journeys otherwise retain native browser clocks.
 
+Playwright's clock does not reach CSS transitions or Web Animations.
+To check a motion's in-between frame, start it inside `holdAnimationClock(page)`, which stops the page's animation clock through DevTools, then pause the started animations at a fixed time; a short tween can otherwise finish before a slow runner gets to it.
+A More disclosure's contents are there as soon as it opens, but stay clipped and outside the scroll height until its slide has grown, so a journey that scrolls to them opens it with `openDisclosure(summary)`.
+The nap journey holds the page clock once the nap starts and draws a few frames at each point of the nap, because a stalled software-rendered frame can outlast the stretch it checks.
+
 When Launch Week is setup for another journey, `completeTutorial` dismisses the Company Message and opens the doors. Seed an existing company when the case does not exercise the opening.
 
 A timed batch acknowledges a Scaling or Data Strategy completion through the existing journey handler, then explicitly clicks Run for its remaining seconds. It finishes paused; dismissing a completion dialog outside a timed batch also leaves the player paused.

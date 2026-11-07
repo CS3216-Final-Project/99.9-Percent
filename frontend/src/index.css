@@ -2205,9 +2205,15 @@ button:disabled {
     transition: height 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out, content-visibility 0.24s allow-discrete;
   }
 
+  /*
+   * Opening shows the contents at once and tweens only the height and fade. A discrete content-visibility transition
+   * would keep them hidden (out of the accessibility tree and find-in-page) until the browser draws the slide's first
+   * frame, which a busy page can delay for seconds. Closing still keeps them until the slide has folded.
+   */
   .more[open]::details-content {
     height: auto;
     opacity: 1;
+    transition-property: height, opacity;
   }
 
   @media (prefers-reduced-motion: reduce) {
