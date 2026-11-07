@@ -62,7 +62,7 @@ export function machineCuesBetween(before: MachineCueState, after: MachineCueSta
   const was = before.game.campaign, c = after.game.campaign;
   if (was && c) {
     if (was.runId !== c.runId) return [];
-    return c.actions.filter(a => a.activatedStep !== null && a.cancelledStep === undefined && (!a.source || a.source === "player") &&
+    return c.actions.filter(a => a.activatedStep !== null && a.cancelledStep === undefined && a.source !== "autoscaler" &&
       was.actions.some(old => old.id === a.id && old.activatedStep === null))
       .map(a => campaignCue(a, before.game, after.game));
   }

@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { expect, it } from "vitest";
-import { advanceSteps } from "@/sim/step";
+import { advanceSteps, step } from "@/sim/step";
 import { applyAction, newLegacyGame, type GameState } from "@/sim";
 import { launchAct, launchCompany } from "@/sim/__tests__/scalingLaunchFixture";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
-import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
+import { preparedReliability, reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { machineCuesBetween, machineScale, MACHINE_POP_SECONDS } from "./machineCues";
 const state = (game: GameState, generation = 1, started = true) => ({ game, generation, started });
 const cues = (a: GameState, b: GameState) => machineCuesBetween(state(a), state(b));
@@ -81,4 +81,15 @@ it("celebrates an installed server while retaining its unrouted state", () => {
   const pending = launchAct(launchCompany(), { type: "add_server" }), after = advanceSteps(pending, 2).state;
   expect(cues(pending, after)[0]).toMatchObject({ targets: ["app-2"], kind: "install", announcement: expect.stringContaining("Route traffic") });
   expect(after.campaign!.snapshot.instances!.find(a => a.id === "app-2")!.demand).toBe(0);
+});
+
+it("keeps the existing pulse when automatic failover promotes the spare", () => {
+  let before = launchAct(preparedReliability(), { type: "arm_reliability" });
+  const changes = [];
+  for (let i = 0; i < 16; i++) {
+    const after = step(before).state;
+    changes.push(...cues(before, after));
+    before = after;
+  }
+  expect(changes).toContainEqual(expect.objectContaining({ targets: ["gateway", "app-3"], label: "app-3", kind: "pulse", badge: "Promoted" }));
 });
