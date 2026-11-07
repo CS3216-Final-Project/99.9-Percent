@@ -27,6 +27,14 @@ Walls between the camera and the room drop out of the way.
 
 Address parameters help with screenshots and testing: `?floor=office` opens on the office floor, `?time=0.5` fixes the time of day (0.5 is noon), and `?graphics=hd` or `?graphics=basic` forces a detail level.
 
+## Infrastructure activation feedback
+
+Upgrades celebrate on the actual server-floor machines for 1.6 seconds: database and application capacity stretch upwards with a short squash and overshoot, new hardware springs into place, and configuration/monitoring/restoration changes give a smaller pulse. A green floor ring and three gold glints accompany the change; a compact number or state floats above the machine's existing label. The pivot stays at the floor, the model settles to its actual installed geometry, and collisions, labels, service health and capacity still use the ordinary game state. Existing upgrade sound cues remain in use.
+
+Feedback watches live activation transitions, including batches of several game seconds, rather than playing action history on mount. Each affected machine has at most one current cue. The presentation clock starts the effect on its first rendered frame, expires it automatically, and clears it on scene replacement or unmount. It keeps playing through a gameplay pause, like a purchase preview, so manual stepping gives visible feedback; it never advances the company. An off-floor effect does not take the player away from their view. Challenge Mode's installed hardware and completed infrastructure research use the same visual effects.
+
+Reduced motion suppresses squash/stretch, moving glints and label travel; a steady ring and brief label identify the changed machine. A polite screen-reader status names the actual change, distinguishing installation from routing and cache deployment from measured warmth. Installation is not a recovery or health-clearance signal. The old sidebar success block is absent; inspection retains precise readings.
+
 ## Walking and views
 
 **Walk** beside the camera buttons walks the building as the player's avatar, one of 18 cube animals from Kenney's CC0 [Cube Pets](https://kenney.nl/assets/cube-pets).

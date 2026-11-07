@@ -1,6 +1,5 @@
 import { test, expect, seedSave, savedGame, advanceCampaignStep, expectUncovered } from "./fixtures";
 import { launchCompany } from "../src/sim/__tests__/scalingLaunchFixture";
-import { infrastructureAction } from "./componentInspection";
 
 for (const phone of [false, true]) {
   test.describe(phone ? "phone launch" : "desktop launch", () => {
@@ -20,11 +19,7 @@ for (const phone of [false, true]) {
       await opportunity.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `test-results/graphical-${phone ? "phone" : "desktop"}.png` });
       if (phone) await page.locator(".phone-sheet").screenshot({ path: "test-results/graphical-phone-panel.png" });
-      else {
-        const top = await opportunity.boundingBox(), bottom = await page.getByRole("region", { name: "Latest infrastructure change" }).boundingBox();
-        if (!top || !bottom) throw Error("Expected both compact panels to be visible");
-        await page.screenshot({ path: "test-results/graphical-panel.png", clip: { x: top.x - 8, y: top.y - 4, width: top.width + 16, height: bottom.y + bottom.height - top.y + 8 } });
-      }
+      else await opportunity.screenshot({ path: "test-results/graphical-panel.png" });
       await opportunity.getByRole("button", { name: "Review launch" }).click();
       const review = page.getByRole("dialog", { name: "Launch growth?", exact: true });
       await expect(review).toContainText("1,000 req/s");
@@ -77,27 +72,6 @@ for (const phone of [false, true]) {
     });
   });
 }
-
-test("explains an unrouted purchase as soon as the server activates", async ({ page, withoutRoom, installClock }) => {
-  await page.setViewportSize({ width: 320, height: 568 });
-  await withoutRoom(); await installClock();
-  await seedSave(page, launchCompany());
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await (await infrastructureAction(page, /Add server/)).click();
-  await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await advanceCampaignStep(page, { seconds: 2, resumeClock: false });
-  const feedback = page.getByRole("region", { name: "Latest infrastructure change" });
-  await expect(feedback.getByRole("img", { name: "Installed; routing needed" })).toBeVisible();
-  await page.clock.runFor(300);
-  await expectUncovered(page, page.getByRole("button", { name: "Run", exact: true }));
-  expect((await savedGame(page)).campaign!.snapshot.instances!.find(a => a.id === "app-2")!.demand).toBe(0);
-  await page.screenshot({ path: "test-results/graphical-feedback.png" });
-  await feedback.getByText("Details", { exact: true }).click();
-  await expect(feedback.locator("details")).toHaveJSProperty("open", true);
-  await expect(feedback.getByText("800 → 800 /s", { exact: true })).toBeVisible();
-  await page.screenshot({ path: "test-results/player-change-feedback.png" });
-});
 
 test.describe("large text phone", () => {
   test.use({ edition: "phone", viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });

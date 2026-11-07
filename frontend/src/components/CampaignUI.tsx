@@ -1,5 +1,4 @@
 import { LaunchOpportunity } from "./LaunchOpportunity";
-import { ChangeFeedback } from "./ChangeFeedback";
 import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "@/game/introduction";
 import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
@@ -192,7 +191,6 @@ export function CampaignPanel() {
         <PinnedRecovery campaign={c} />
       </header>}
       <CampaignGuidance />
-      <ChangeFeedback/>
       <div className="incident-symptoms">
         <dl className="impact">
           <div><Concept kind={m.latencyMs >= Q.latencyThresholdMs ? "critical" : "users"} icon="timer" /><dt>Latency · ms</dt><dd>{m.latencyMs.toFixed(0)}</dd></div>
@@ -308,7 +306,6 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
           <Meter value={(c.step-a.requestedStep)/(a.activationStep-a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`}/>
         </div>)}
       </section>
-      <ChangeFeedback/>
       <EquipmentShortcuts disabled={disabled}/>
     </section>
   </EquipmentPanel>;
