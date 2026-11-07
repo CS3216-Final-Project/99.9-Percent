@@ -93,7 +93,7 @@ export function validateEnvelope(value: unknown): Validation {
     const legacyPreventionInputs=phase6?e.inputs.length:e.legacyPreventionInputs??0;
     if(!integer(legacyPreventionInputs) || legacyPreventionInputs>e.inputs.length ||
         (!phase6 && !phase7 && !phase8 && !phase9 && e.schemaVersion!==SCHEMA_VERSION && legacyPreventionInputs!==0))return {status:"corrupt"};
-    const combinedActions = ["enter_combined", "start_growth_wave", "acknowledge_growth", "complete_campaign", "accept_scaling_risk", "run_promotion"];
+    const combinedActions = ["enter_combined", "start_growth_wave", "acknowledge_growth", "complete_campaign", "accept_scaling_risk", "run_promotion", "launch_scaling"];
     if (!phase7 && !phase8 && !phase9 && e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => combinedActions.includes(i.action.type))) return {status:"corrupt"};
     // Incidents opened while replaying older saves keep their original self-resolving rule.
     const legacyIncidentStep = e.schemaVersion === SCHEMA_VERSION ? e.legacyIncidentStep ?? 0 : e.step;

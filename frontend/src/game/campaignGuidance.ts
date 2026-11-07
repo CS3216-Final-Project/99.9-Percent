@@ -37,6 +37,7 @@ export function campaignObjective(g: GameState) {
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return gradedSpikes(c.spikeStage)&&!spikeTestPassed(c.spikeStage)?`Pass the spike test: serve at least ${PASS_SHARE} of a graded spike's requests.`:"Handle changing demand while managing capacity costs.";
  if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";
+ if(c.scaling?.version===2&&!c.scaling.consumed) return c.scaling.dueStep===null?"Prepare your infrastructure, then choose when to launch the growth campaign.":"Run the clock to see whether your architecture can serve the launch.";
  if(c.openingMilestone?.acknowledged) return c.scaling?"Prepare the system for the next growth wave.":"Keep operating, then continue to Scaling & Routing with Next.";
  if(preventionAvailable(c)) return "Inspect the Application and Database; keep service healthy at full demand.";
  return "Observe demand and compare component evidence.";
@@ -93,10 +94,17 @@ export function campaignGuidance(g: GameState) {
   if(g.phase!=="ended")notice=`${c.launchWeek?"Launch Week":"The Opening"} is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.`;
   if(g.phase!=="ended")pendingAction={label:"Continue to Scaling & Routing",action:{type:"enter_scaling"}};
  } else if(openingDone) {
+  if(c.scaling?.version===2) {
+   add("launch","Growth campaign launched",c.scaling.dueStep!==null);
+   add("growth","Scaling growth occurred",c.scaling.consumed);
+   add("queues","Application and Database queues empty",queuesEmpty);
+   if(c.scaling.dueStep!==null&&!c.scaling.consumed)waiting=`Growth arrives at game second ${c.scaling.dueStep}. Pause freezes the countdown.`;
+  } else {
   add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,!!c.scaling?.consumed||c.dbCapacity>=P.dbCapacity||!!c.scalingConsent);
   add("growth","Scaling growth occurred",!!c.scaling?.consumed);
   add("queues","Application and Database queues empty",queuesEmpty);
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
+  }
   if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
   // Prevention stays a valid path, but its checks are not listed: they appear only seconds before the incident is due,

@@ -470,7 +470,9 @@ export type Action =
   | { type: "contrast_workload" }
   | { type: "deploy_cache" }
   | { type: "tune_cache" }
-  | { type: "enter_scaling" }
+  /** Version 2 lets the player launch growth; historical inputs retain automatic growth. */
+  | { type: "enter_scaling"; version?: 2 }
+  | { type: "launch_scaling" }
   | { type: "scale_up"; appId: string }
   | { type: "deploy_load_balancer" }
   | { type: "set_routing"; mode: "single" | "balanced"; targets: string[] }
@@ -493,7 +495,7 @@ export type Action =
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
   | { type: "keep_playing" }
-  | { type: "acknowledge_milestone"; enterScaling?: boolean }
+  | { type: "acknowledge_milestone"; enterScaling?: boolean; scalingVersion?: 2 }
   | { type: "acknowledge_prevention_review" };
 
 export type FailureReason =

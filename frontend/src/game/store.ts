@@ -1061,7 +1061,8 @@ export const useGame = create<Store>()((set, get) => {
     act: (action) => {
       // Version new completions while preserving historical replay inputs.
       if(action.type==="complete_introduction")action={...action,handoff:"opening"};
-      if(action.type==="enter_spikes")action={...action,version:2};
+      if(action.type==="enter_spikes" || action.type==="enter_scaling")action={...action,version:2};
+      if(action.type==="acknowledge_milestone")action={...action,scalingVersion:2};
       const game = get().game, c = game.campaign;
       const acknowledgement = c && requiredAcknowledgement(game);
       // Launch Week's research pick still comes before its milestone, which waits for it.
@@ -1074,7 +1075,7 @@ export const useGame = create<Store>()((set, get) => {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
         const wasRunning = get().running;
-        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
+        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","complete_campaign","accept_scaling_risk","launch_scaling"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");

@@ -90,6 +90,8 @@ import { Ghosts } from "./Ghosts";
 import { rackLit } from "./spotSpec";
 import { SpotBeams } from "./SpotBeams";
 import { autoscaleSpot } from "@/game/autoscaleSpotlight";
+import { MachineChangeNote, MachineFeedbackAnnouncement, MachineFeedbackClock, MachineMotion } from "./MachineFeedback";
+import { MachineFeedbackContext, useMachineFeedback } from "./useMachineFeedback";
 import { changeOf } from "./ghostSpec";
 import { IN_GATE, OUT_GATE } from "./trafficLayout";
 import { PathGlow } from "./SpotBeams";
@@ -605,6 +607,7 @@ const TRIM = EQUIPMENT.trim;
 const BEZEL = EQUIPMENT.bezel;
 
 function Rack({
+  machineId,
   x,
   z,
   led,
@@ -613,6 +616,7 @@ function Rack({
   tint = STEEL,
   dim = false,
 }: {
+  machineId: string;
   x: number;
   z: number;
   led: Led;
@@ -627,7 +631,7 @@ function Rack({
   const hd = useDetail() === "hd";
   const shell = useMemo(() => (dim ? `#${new THREE.Color(tint).multiplyScalar(0.45).getHexString()}` : tint), [tint, dim]);
   return (
-    <group position={[x, 0, z]}>
+    <MachineMotion id={machineId} position={[x, 0, z]} height={size.h}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
         <meshStandardMaterial color={shell} metalness={hd ? 0.45 : 0.1} roughness={hd ? 0.42 : 0.8} />
@@ -657,7 +661,7 @@ function Rack({
           toneMapped={false}
         />
       </mesh>
-    </group>
+    </MachineMotion>
   );
 }
 
@@ -1023,6 +1027,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const tone = inspecting ? "busy" : m.symptomatic.includes(id) ? "alert" : !built ? "absent" : m.states[id];
   // Guided Mode always shows each machine's load; Challenge Mode has no campaign and never does.
   const load = useGame(s => loadOf(s.game.campaign, m, id));
+  const individualApps = useGame(s => !!s.game.campaign?.openingMilestone?.acknowledged);
   return (
     <button
       type="button"
@@ -1047,6 +1052,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       {inspecting && <span className="eq-note">investigating</span>}
       {inspected && !inspecting && <span className="eq-note">checked</span>}
       <LoadBar ratio={load} />
+      <MachineChangeNote id={id} fleet={id === "app" && !individualApps}/>
     </button>
   );
 }
@@ -1099,7 +1105,7 @@ function Labels({ landed }: { landed: Floor | null }) {
       {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (!trafficView || ["gateway", "app", "db", "cache"].includes(id)) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}${autoscaling===a.id?" is-autoscaling":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={serverName(a.id)} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{serverName(a.id)}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}${autoscaling===a.id?" is-autoscaling":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={serverName(a.id)} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{serverName(a.id)}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /><MachineChangeNote id={a.id}/></button>)}
     </div>
   );
 }
@@ -1524,40 +1530,40 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
         {walking && landed === "servers" && <WalkFloor />}
 
         {/* Network edge */}
-        <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" dim={dim("gateway")} />
-        {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} dim={dim("lb")} />}
+        <Rack machineId="gateway" x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" dim={dim("gateway")} />
+        {m.lb && <Rack machineId="lb" x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} dim={dim("lb")} />}
 
         {/* App servers */}
         {m.hosts.slice(0, 12).map((led, i) => {
           const p = appSlot(i);
-          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectInRoom("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} tint={campaign && unrouted.has(campaign.apps[i]?.id) ? EQUIPMENT.face.ledOff : undefined} dim={dim(campaign?.apps[i]?.id ?? `app-${i+1}`)} /></group>;
+          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectInRoom("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack machineId={campaign?.apps[i]?.id ?? `app-${i+1}`} x={p.x} z={p.z} led={led} tint={campaign && unrouted.has(campaign.apps[i]?.id) ? EQUIPMENT.face.ledOff : undefined} dim={dim(campaign?.apps[i]?.id ?? `app-${i+1}`)} /></group>;
         })}
         {Array.from({ length: m.temp }, (_, i) => {
           const p = tempSlot(i);
-          return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} dim={dim("temp")} />;
+          return <Rack machineId={`temp-${i}`} key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} dim={dim("temp")} />;
         })}
-        {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} dim={dim("standby")} />}
+        {m.standby && <Rack machineId="standby" x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} dim={dim("standby")} />}
 
         {/* Data tier */}
-        {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} dim={dim("cache")} />}
+        {m.cache && <Rack machineId="cache" x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} dim={dim("cache")} />}
         {Array.from({ length: m.dbCabinets }, (_, i) => {
           const p = dbSlot(i);
-          return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("db")} />;
+          return <Rack machineId="db" key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("db")} />;
         })}
-        {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("replica")} />}
-        {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} dim={dim("backup")} />}
+        {m.replica && <Rack machineId="replica" x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("replica")} />}
+        {m.backup && <Rack machineId="backup" x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} dim={dim("backup")} />}
 
         {/* Monitoring wall */}
-        {m.monitoring > 0 &&
-          [-1.6, 0, 1.6].map((dx, i) => (
+        {m.monitoring > 0 && <MachineMotion id="monitoring" position={[POS.monitoring.x, 0, POS.monitoring.z]} height={2.6}>
+          {[-1.6, 0, 1.6].map((dx, i) => (
             <Screen
               key={i}
               kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
               w={1.45}
               h={0.9}
-              position={[POS.monitoring.x + dx, 2.05, ROOM.z0 + 0.05]}
+              position={[dx, 2.05, ROOM.z0 + 0.05 - POS.monitoring.z]}
             />
-          ))}
+          ))}</MachineMotion>}
 
         {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
         {campaign ? (
@@ -1970,6 +1976,7 @@ function roomEvents(store: Parameters<typeof pointerEvents>[0]) {
 }
 
 export default function Facility() {
+  const feedback = useMachineFeedback();
   const container = useRef<HTMLDivElement>(null);
   const trafficView = useGame(trafficViewOn);
   // The change the room is previewing, named on the stage for assistive checks and tests; the room draws it.
@@ -2014,6 +2021,7 @@ export default function Facility() {
   // The letterbox and vignette belong to the overview's cutscene; a view from the avatar rides without them.
   const fromAvatar = useGame((s) => s.walking && s.viewpoint !== "overview");
   return (
+    <MachineFeedbackContext.Provider value={feedback}>
     <div className={`stage-canvas${landed === null && !fromAvatar ? " is-riding" : ""}`} ref={container} tabIndex={-1} data-ghost={ghost ?? undefined}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
@@ -2045,7 +2053,10 @@ export default function Facility() {
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
           <DetailContext.Provider value={quality.detail}>
-            <Scene quality={quality} landed={landed} />
+            <MachineFeedbackContext.Provider value={feedback}>
+              <MachineFeedbackClock/>
+              <Scene quality={quality} landed={landed} />
+            </MachineFeedbackContext.Provider>
           </DetailContext.Provider>
         )}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
@@ -2084,11 +2095,13 @@ export default function Facility() {
       <ViewOverlay />
       {!isPhoneEdition() && !trafficView && <Minimap onFloor={(f) => pressFloor(f, "map")} />}
       <Labels landed={landed} />
+      <MachineFeedbackAnnouncement feedback={feedback}/>
       <HoverTip container={container} />
       <WalkControls />
       <ArcadePanel />
       <Caption />
       <RoomDock stage={container} />
     </div>
+    </MachineFeedbackContext.Provider>
   );
 }
