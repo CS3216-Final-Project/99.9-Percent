@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { useGame } from "@/game/store";
 import { launchAct, launchCompany, recoveredOpeningCompany } from "@/sim/__tests__/scalingLaunchFixture";
+import { campaignAttention } from "@/game/campaignAttention";
 import { LaunchOpportunity } from "./LaunchOpportunity";
 import { ChangeFeedback } from "./ChangeFeedback";
 
@@ -14,6 +15,7 @@ function show() {
 
 it("keeps reviewing and declining read-only, then commits one explicit launch", () => {
   show(); const before = useGame.getState().game;
+  expect(campaignAttention(before)).toMatchObject({ reason: "scaling-launch", target: "launch" });
   expect(screen.getByRole("region", { name: "Growth launch opportunity" }).textContent).toContain("$7,200");
   fireEvent.click(screen.getByRole("button", { name: "Review launch" }));
   expect(screen.getByRole("dialog").textContent).toContain("1,000 req/s");

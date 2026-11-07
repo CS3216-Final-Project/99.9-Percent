@@ -2,7 +2,6 @@
 import { introductionActive, nextIntroductionComponent } from "@/sim/introduction";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
-import { changeActivity } from "./changeFeedback";
 import { autoscalerActivity } from "./reportEvents";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
@@ -1132,7 +1131,7 @@ export const useGame = create<Store>()((set, get) => {
         if(get().deployRush&&(result.stopReason||newIncident||!result.state.campaign?.pending.length))set({deployRush:false});
         commit(result.state);
         // Surface the autoscaler's moves so servers never appear or change silently.
-        const activity=[...autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]),...changeActivity(game.campaign,result.state.campaign!)];
+        const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
         if(activity.length)get().notify(activity.join(" · "));
         return;
       }
@@ -1153,7 +1152,7 @@ export const useGame = create<Store>()((set, get) => {
       set({ remainderMs: 0 });
       const result=advanceSteps(game, count);
       commit(result.state);
-      const activity=[...autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]),...changeActivity(game.campaign,result.state.campaign!)];
+      const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
       if(activity.length)get().notify(activity.join(" · "));
     },
 

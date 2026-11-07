@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, advanceCampaignStep, expectUncovered } from "./fixtures";
 import { launchCompany } from "../src/sim/__tests__/scalingLaunchFixture";
 import { infrastructureAction } from "./componentInspection";
 
@@ -43,6 +43,7 @@ for (const phone of [false, true]) {
 }
 
 test("explains an unrouted purchase as soon as the server activates", async ({ page, withoutRoom, installClock }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
   await withoutRoom(); await installClock();
   await seedSave(page, launchCompany());
   await page.goto("/");
@@ -52,6 +53,8 @@ test("explains an unrouted purchase as soon as the server activates", async ({ p
   await advanceCampaignStep(page, { seconds: 2, resumeClock: false });
   const feedback = page.getByRole("region", { name: "Latest infrastructure change" });
   await expect(feedback).toContainText("needs a routing change");
+  await page.clock.runFor(300);
+  await expectUncovered(page, page.getByRole("button", { name: "Run", exact: true }));
   expect((await savedGame(page)).campaign!.snapshot.instances!.find(a => a.id === "app-2")!.demand).toBe(0);
   await feedback.getByText(/Observed across activation/).click();
   await expect(feedback.locator("details")).toHaveJSProperty("open", true);

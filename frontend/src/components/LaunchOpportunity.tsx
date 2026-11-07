@@ -21,7 +21,7 @@ export function LaunchOpportunity() {
     <p>{committed ? `Traffic rises to ${num(P.traffic)} req/s in ${Math.max(0, stage.dueStep! - c.step)} game seconds. Run to observe the result; Pause freezes the countdown.` : `Marketing is ready. You choose when traffic grows from ${num(c.incomingRate)} to ${num(P.traffic)} req/s.`}</p>
     {!committed && <><p>Up to <strong>{money(extraRevenue)} more revenue/week</strong> if every additional request succeeds. Revenue becomes spendable at settlement.</p>
       <p className="muted">Keep preparing while current traffic earns revenue and running costs continue.</p>
-      <button type="button" className="btn btn-primary" disabled={!!blocker} onClick={() => { setRunning(false); setReview(true); }}>Review launch</button>
+      <button type="button" className="btn btn-primary" data-guidance="review-launch" disabled={!!blocker} onClick={() => { setRunning(false); setReview(true); }}>Review launch</button>
       {blocker && <p>{blocker}</p>}
     </>}
     {review && !committed && <Modal title="Launch growth campaign?" onClose={() => setReview(false)}>

@@ -40,9 +40,3 @@ export function changeFeedback(c: Campaign) {
       : null,
   };
 }
-
-/** One existing toast per newly observed player activation; no timer or save state of its own. */
-export function changeActivity(before: Campaign, after: Campaign): string[] {
-  const latest = changeFeedback(after);
-  return latest && latest.id > (before.trace.at(-1)?.id ?? 0) ? [`${latest.heading}. ${latest.note}`] : [];
-}

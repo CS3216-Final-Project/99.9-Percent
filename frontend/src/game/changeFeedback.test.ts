@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { changeFeedback, changeActivity } from "./changeFeedback";
+import { changeFeedback } from "./changeFeedback";
 import { advanceSteps } from "@/sim/step";
 import { launchAct, launchCompany } from "@/sim/__tests__/scalingLaunchFixture";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
@@ -27,13 +27,4 @@ it("shows a cold cache warming using measured hits, never its future target", ()
   game = advanceSteps(game, 1).state;
   expect(changeFeedback(game.campaign!)!.cache!.hits).toBeGreaterThan(0);
   expect(changeFeedback(game.campaign!)!.cache!.effectiveHitRateUsed).toBeLessThan(changeFeedback(game.campaign!)!.cache!.target);
-});
-
-it("announces a completed player purchase once and leaves its source state unchanged", () => {
-  const before = launchAct(launchCompany(), { type: "add_server" });
-  const unchanged = structuredClone(before);
-  const after = advanceSteps(before, 2).state;
-  expect(changeActivity(before.campaign!, after.campaign!)).toEqual([expect.stringContaining("needs a routing change")]);
-  expect(changeActivity(after.campaign!, advanceSteps(after, 1).state.campaign!)).toEqual([]);
-  expect(before).toEqual(unchanged);
 });

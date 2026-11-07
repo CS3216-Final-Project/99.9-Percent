@@ -17,7 +17,7 @@ import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance, PASS_SHARE } from "./chapter4Guidance";
 import { serverName } from "@/sim";
 
-export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "risk" | "menu" | "finance" | "research";
+export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "launch" | "next" | "reliability" | "risk" | "menu" | "finance" | "research";
 export interface AttentionDecision {
   chapter: number;
   key: string;
@@ -556,7 +556,7 @@ function baseAttention(game: GameState): AttentionDecision {
   if (c.dataStage && !c.dataStage.consumed && canEnterData(game)) return run("data-growth", "The company is ready to observe the scheduled workload increase.");
   if (c.scaling && !c.scaling.consumed) {
     if(c.scaling.version===2) return c.scaling.dueStep===null
-      ? hint("scaling-launch", "You choose when the growth campaign launches. More served traffic earns revenue; extra demand can overload your architecture.", "Compare App Servers, Network and Database, then use Review launch in the System metrics panel. You can keep preparing while the company operates.", "requirements")
+      ? hint("scaling-launch", "You choose when the growth campaign launches. More served traffic earns revenue; extra demand can overload your architecture.", "Compare App Servers, Network and Database, then use Review launch in the System metrics panel. You can keep preparing while the company operates.", "launch")
       : run("scaling-growth", `Your launch is committed. Traffic rises to 1,400 req/s at game second ${c.scaling.dueStep}.`);
     if (c.dbCapacity >= P.dbCapacity || c.scalingConsent) return run("scaling-growth", "Growth preparation is resolved. The next wave requires game time.");
     return result("scaling-choice", previewCampaignAction(game, { type: "accept_scaling_risk" }).ok ? "progression" : null, "The next growth wave needs database headroom or your explicit acceptance of the risk.", "Consider growth with current capacity explains the risk choice. You can Keep preparing instead; opening it does not accept the risk.", "risk");
