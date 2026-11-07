@@ -12,6 +12,13 @@ export function changeFeedback(c: Campaign) {
   const before = c.recent.find(m => m.step === action.activatedStep! - 1);
   const latest = c.snapshot;
   const target = action.targetId ? serverName(action.targetId) : "Server";
+  const capacity = action.type === "upgrade-db" ? { label: "Capacity", before: event.data.dbBefore, after: event.data.dbAfter, unit: "ops/s" }
+    : action.type === "scale-up" ? { label: "Capacity", before: event.data.capacityBefore, after: event.data.capacityAfter, unit: "req/s" }
+    : action.type === "routing" ? { label: "Routed capacity", before: event.data.effectiveBefore, after: event.data.effectiveAfter, unit: "req/s" } : null;
+  const measuredCapacity = capacity && typeof capacity.before === "number" && typeof capacity.after === "number"
+    ? { ...capacity, before: capacity.before, after: capacity.after } : null;
+  const connection = action.type === "add-app" ? after?.instances?.find(a => a.id === action.targetId)?.routed
+    : action.type === "deploy-lb" && after?.routing ? after.routing.mode === "balanced" : undefined;
   const heading = action.type === "add-app" ? `${target} installed`
     : action.type === "upgrade-db" ? "Database upgraded"
     : action.type === "scale-up" ? `${target} scaled up`
@@ -33,6 +40,8 @@ export function changeFeedback(c: Campaign) {
     : "The change is active. Check service readings to see whether the company is stable.";
   return {
     id: event.id, step: event.step, title: ACTION_NAMES[action.type], heading, note, before, after,
+    capacity: measuredCapacity, connection,
+    admission: after && (action.type === "limit" || action.type === "unlimit") ? { admitted: after.admitted, rejected: after.rejected, incoming: after.incoming } : null,
     // Cache warmth is deliberately live; the activation comparison remains a recorded pair.
     cache: action.type === "cache" || action.type === "cache-tuning" ? latest.data : undefined,
     warning: after && after.db.demand > after.db.capacity ? "Database demand still exceeds its capacity at activation. More app capacity cannot expand the database."

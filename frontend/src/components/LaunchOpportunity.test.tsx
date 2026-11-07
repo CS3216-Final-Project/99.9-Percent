@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { useGame } from "@/game/store";
 import { launchAct, launchCompany, recoveredOpeningCompany } from "@/sim/__tests__/scalingLaunchFixture";
 import { campaignAttention } from "@/game/campaignAttention";
+import { dataCompany } from "@/sim/__tests__/dataFixture";
+import { advanceSteps } from "@/sim/step";
 import { LaunchOpportunity } from "./LaunchOpportunity";
 import { ChangeFeedback } from "./ChangeFeedback";
 
@@ -24,7 +26,7 @@ it("keeps reviewing and declining read-only, then commits one explicit launch", 
   fireEvent.click(screen.getByRole("button", { name: "Review launch" }));
   fireEvent.click(screen.getByRole("button", { name: "Launch campaign" }));
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(screen.getByRole("region", { name: "Growth launch opportunity" }).textContent).toContain("3 game seconds");
+  expect(screen.getByRole("progressbar", { name: "Launch countdown" }).getAttribute("aria-valuetext")).toContain("3 game seconds");
   expect(useGame.getState().game.campaign!.inputs.filter(i => i.action.type === "launch_scaling")).toHaveLength(1);
   act(() => useGame.getState().stepSeconds(2));
   expect(useGame.getState().game.campaign!.incomingRate).toBe(800);
@@ -37,7 +39,19 @@ it("dismisses one activation and shows feedback for the next completed change", 
   expect(screen.queryByRole("region", { name: "Latest infrastructure change" })).toBeNull();
   act(() => useGame.setState({ game: launchAct(useGame.getState().game, { type: "add_server" }) }));
   act(() => useGame.getState().stepSeconds(2));
-  expect(within(screen.getByRole("region", { name: "Latest infrastructure change" })).getByText(/needs a routing change/)).toBeTruthy();
+  const feedback = within(screen.getByRole("region", { name: "Latest infrastructure change" }));
+  expect(feedback.getByRole("img", { name: "Installed; routing needed" })).toBeTruthy();
+  expect(feedback.getByText("Details").closest("details")!.open).toBe(false);
+});
+
+it("shows cache warmth as a live measured meter while explanations stay folded", () => {
+  const game = advanceSteps(launchAct(advanceSteps(dataCompany(), 3).state, { type: "deploy_cache" }), 2).state;
+  useGame.setState({ game, ready: true, started: true, onboarding: false, tour: null, running: false });
+  render(<ChangeFeedback/>);
+  expect(screen.getByRole("meter").getAttribute("aria-valuenow")).toBe("0");
+  act(() => useGame.getState().stepSeconds(1));
+  expect(screen.getByRole("meter").getAttribute("aria-valuenow")).toBe("12");
+  expect(screen.getByText("Details").closest("details")!.open).toBe(false);
 });
 
 it.each([false, true])("versions a new Scaling entry after Opening (stay first: %s)", stay => {
