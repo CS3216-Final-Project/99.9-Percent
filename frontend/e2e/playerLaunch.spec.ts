@@ -19,7 +19,8 @@ for (const phone of [false, true]) {
       await expect(opportunity.getByRole("img", { name: /Launch demand/ })).toBeVisible();
       await opportunity.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `test-results/graphical-${phone ? "phone" : "desktop"}.png` });
-      if (!phone) {
+      if (phone) await page.locator(".phone-sheet").screenshot({ path: "test-results/graphical-phone-panel.png" });
+      else {
         const top = await opportunity.boundingBox(), bottom = await page.getByRole("region", { name: "Latest infrastructure change" }).boundingBox();
         if (!top || !bottom) throw Error("Expected both compact panels to be visible");
         await page.screenshot({ path: "test-results/graphical-panel.png", clip: { x: top.x - 8, y: top.y - 4, width: top.width + 16, height: bottom.y + bottom.height - top.y + 8 } });
