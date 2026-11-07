@@ -1,0 +1,11 @@
+.launch-opportunity, .change-feedback {
+  padding-block: 12px;
+  border-top: 1px solid var(--control-edge);
+}
+.launch-opportunity h3, .change-feedback h3 { margin: 0; font-size: var(--text-md); }
+.launch-opportunity p, .change-feedback p { margin-block: 8px; }
+.launch-readings { margin-block: 12px; display: grid; gap: 8px; }
+.launch-readings > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+.launch-readings dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.change-feedback-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.change-feedback-heading .icon-btn { flex: none; }

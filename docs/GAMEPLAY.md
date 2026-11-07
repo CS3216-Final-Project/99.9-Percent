@@ -83,7 +83,9 @@ The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
 ### Chapter 2: Scaling & Routing
 
-Growth to 1,400 req/s is scheduled three steps after the company is ready: management phase, no active incident, empty queues and purchased database capacity of at least 2,000 ops/s.
+New entries into Scaling & Routing use a player-controlled growth launch. Marketing offers growth from 800 to 1,400 req/s; the player can keep operating and preparing, or open Review launch in System metrics. The review shows current routed application capacity, database capacity and unfinished deployments, and warns that total capacity does not guarantee each evenly routed server can cope. Keep preparing is read-only. Launch campaign commits the company to 1,400 req/s exactly three game seconds later, without a cash reward or a required database purchase. The opportunity is up to $7,200 additional revenue per 60-second week if all additional requests succeed; revenue still settles normally and operating costs continue while waiting. Launch requires positive cash, stable management, reviewed reports and empty queues, but permits unfinished purchases and insufficient capacity. It cannot be cancelled; Pause freezes its saved deadline. Overload, rejection and bankruptcy retain their normal consequences. New chapter-entry inputs record version 2; existing Scaling entries replay their original automatic timing. Both direct continuation from Opening and returning after Stay in this chapter use the new launch.
+
+For retained version-1 Scaling entries, growth to 1,400 req/s is scheduled three steps after the company is ready: management phase, no active incident, empty queues and purchased database capacity of at least 2,000 ops/s.
 A separate confirmation lets the player accept the growth with current database capacity; it grants nothing and overload and bankruptcy stay possible.
 
 Responses are scaling an app to 1,600 req/s, or installing another app and configuring load-balanced routing.

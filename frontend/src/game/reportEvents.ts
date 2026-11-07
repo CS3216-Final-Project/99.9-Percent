@@ -104,6 +104,7 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "failover-activated": return line(`Failover moved traffic to ${app(d.appId)}`, "No capacity added");
       case "failover-cancelled": return line("Failover cancelled", d.reason ? String(d.reason) : null);
       case "settlement": return line(`Week ${d.period} settled`, `Revenue ${dollars(d.revenueCents)}`, `Net ${dollars(d.netCents)}`);
+      case "scaling-launch-requested": return line("Growth campaign launched", `Traffic rises to ${num(d.nextDemand)} req/s at game second ${d.dueStep}`);
       case "traffic-change": return line("Traffic changed", `${num(d.from)} to ${num(d.to)} req/s`);
       case "traffic-scheduled": return line("More traffic scheduled", `Arrives at game second ${d.dueStep}`);
       case "traffic-spike-started": return line("Traffic spike started", `Incoming ${num(d.to)} req/s`);

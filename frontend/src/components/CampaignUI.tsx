@@ -1,3 +1,5 @@
+import { LaunchOpportunity } from "./LaunchOpportunity";
+import { ChangeFeedback } from "./ChangeFeedback";
 import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "@/game/introduction";
 import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
@@ -111,7 +113,8 @@ function CampaignGuidance() {
     {model.requirements.length>0&&<ChapterChecklist model={model}/>}
     {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
-    {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
+    {c.scaling?.version===1&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
+    <LaunchOpportunity/>
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}><Icon name="goal" size={16} />View run scorecard</button>}
 
   </section>;
@@ -189,6 +192,7 @@ export function CampaignPanel() {
         <PinnedRecovery campaign={c} />
       </header>}
       <CampaignGuidance />
+      <ChangeFeedback/>
       <div className="incident-symptoms">
         <dl className="impact">
           <div><Concept kind={m.latencyMs >= Q.latencyThresholdMs ? "critical" : "users"} icon="timer" /><dt>Latency · ms</dt><dd>{m.latencyMs.toFixed(0)}</dd></div>
@@ -199,7 +203,7 @@ export function CampaignPanel() {
       {c.incident && <IncidentRecovery campaign={c} />}
       <EquipmentShortcuts disabled={disabled}/>
       <LaunchResearch/>
-      {unlocked&&!c.launchWeek&&!c.scaling?.consumed&&<p className="muted">{c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
+      {unlocked&&!c.launchWeek&&c.scaling?.version!==2&&!c.scaling?.consumed&&<p className="muted">{c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
         <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${serverName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
@@ -304,6 +308,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
           <Meter value={(c.step-a.requestedStep)/(a.activationStep-a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`}/>
         </div>)}
       </section>
+      <ChangeFeedback/>
       <EquipmentShortcuts disabled={disabled}/>
     </section>
   </EquipmentPanel>;
