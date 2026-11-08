@@ -1,10 +1,17 @@
 import type { Page } from '@playwright/test';
-import { test, expect, seedClassicSave, unlockChallenge } from './fixtures';
+import { test, expect, holdAnimationClock, seedClassicSave, seedSave, unlockChallenge } from './fixtures';
 import { advanceTurn, newLegacyGame as newGame } from '../src/sim';
+import { reliabilityOutcome } from '../src/game/__fixtures__/reliabilityOutcome';
 
-// Animations are paused at a fixed time, so each in-between frame is checked exactly, however slowly the browser draws.
-async function freezeAt(page: Page, time: number) {
+/**
+ * Runs `action` with the animation clock held, then pauses what it started at a fixed time, so each in-between frame is
+ * checked exactly however slowly the browser draws, and a short tween cannot finish before the test reaches it.
+ */
+async function freezeAt(page: Page, time: number, action: () => Promise<unknown>) {
+  const release = await holdAnimationClock(page);
+  await action();
   await page.evaluate(time => document.getAnimations().forEach(animation => { animation.pause(); animation.currentTime = time; }), time);
+  await release();
 }
 const finish = (page: Page) => page.evaluate(() => document.getAnimations().forEach(animation => animation.play()));
 const box = async (page: Page, selector: string) => (await page.locator(selector).boundingBox())!;
@@ -26,8 +33,7 @@ test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 test('the selected machine\'s details tween their height when they open and when another machine is chosen', async ({ page }) => {
   await openChallenge(page, 1440);
   const panel = page.getByRole('complementary', { name: 'Details' });
-  await panel.getByRole('button', { name: 'Inspect Network', exact: true }).click();
-  await freezeAt(page, 30);
+  await freezeAt(page, 30, () => panel.getByRole('button', { name: 'Inspect Network', exact: true }).click());
   const opening = (await box(page, '.reveal')).height;
   await finish(page);
   await expect.poll(() => page.evaluate(() => document.querySelector('.reveal')!.getAnimations().length)).toBe(0);
@@ -36,8 +42,7 @@ test('the selected machine\'s details tween their height when they open and when
   expect(opening).toBeGreaterThan(0);
   expect(opening).toBeLessThan(network / 2);
 
-  await panel.getByRole('button', { name: 'Inspect Growth', exact: true }).click();
-  await freezeAt(page, 150);
+  await freezeAt(page, 150, () => panel.getByRole('button', { name: 'Inspect Growth', exact: true }).click());
   const between = (await box(page, '.reveal')).height;
   await finish(page);
   await expect.poll(() => page.evaluate(() => document.querySelector('.reveal')!.getAnimations().length)).toBe(0);
@@ -50,8 +55,7 @@ test('the selected machine\'s details tween their height when they open and when
 test('hiding the panel keeps its button in full view as it glides to the reopen button', async ({ page }) => {
   await openChallenge(page, 1440);
   const hide = await box(page, '.panel-toggle');
-  await page.getByRole('button', { name: 'Hide equipment and actions', exact: true }).click();
-  await freezeAt(page, 150);
+  await freezeAt(page, 150, () => page.getByRole('button', { name: 'Hide equipment and actions', exact: true }).click());
   const button = page.getByRole('button', { name: 'Equipment & actions', exact: true });
   await expect(button).toBeVisible();
   expect(await button.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
@@ -67,8 +71,7 @@ test('hiding the panel keeps its button in full view as it glides to the reopen 
   expect(middle.width).toBeGreaterThan(hide.width + 10);
   expect(middle.width).toBeLessThan(reopen.width - 10);
 
-  await button.click();
-  await freezeAt(page, 150);
+  await freezeAt(page, 150, () => button.click());
   const back = page.getByRole('button', { name: 'Hide equipment and actions', exact: true });
   expect(await back.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
   expect((await back.boundingBox())!.x).toBeGreaterThan(hide.x + 10);
@@ -90,4 +93,39 @@ test('over the bottom sheet the button stays at the bottom edge and its chevron 
   const stage = (await page.getByRole('main').boundingBox())!, reopen = (await button.boundingBox())!;
   expect(stage.y + stage.height - (reopen.y + reopen.height)).toBeCloseTo(12, 0);
   expect(stage.x + stage.width - (reopen.x + reopen.width)).toBeCloseTo(12, 0);
+});
+
+test('a report\'s technical details are readable the moment they open and still slide open', async ({ page }) => {
+  await page.route('**/api/**', route => route.abort());
+  await seedSave(page, reliabilityOutcome(true));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue company', exact: true }).click();
+  const outcome = page.getByRole('dialog', { name: 'Reliability outcome', exact: true });
+  const evidence = outcome.getByText('Application failure', { exact: true });
+  const slide = () => outcome.locator('details.report-technical').evaluate(el => { const style = getComputedStyle(el, '::details-content'); return { height: parseFloat(style.height), opacity: Number(style.opacity) }; });
+  await expect(evidence).toBeHidden();
+  // A busy browser can take seconds to draw the first frame of the slide. Until then the evidence must not stay hidden.
+  const release = await holdAnimationClock(page);
+  await outcome.getByText('View Technical Details', { exact: true }).click();
+  await expect(evidence).toBeVisible();
+  expect(await slide()).toEqual({ height: 0, opacity: 0 });
+  await release();
+  await expect.poll(async () => (await slide()).opacity).toBe(1);
+  expect((await slide()).height).toBeGreaterThan(100);
+
+  // Folding away keeps the evidence on screen until the slide has closed.
+  const fold = await holdAnimationClock(page);
+  await outcome.getByText('View Technical Details', { exact: true }).click();
+  await expect(evidence).toBeVisible();
+  await fold();
+  await expect(evidence).toBeHidden();
+
+  // Reduced motion opens it at once.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const still = await holdAnimationClock(page);
+  await outcome.getByText('View Technical Details', { exact: true }).click();
+  await expect(evidence).toBeVisible();
+  expect((await slide()).opacity).toBe(1);
+  expect((await slide()).height).toBeGreaterThan(100);
+  await still();
 });

@@ -186,10 +186,22 @@ it("asks before switching away from a game that cannot be saved", () => {
   fireEvent.click(within(card(choices, "Challenge Mode")).getByRole("button", { name: "Start Challenge Mode" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: false });
   // The warning sits in the card that asked, and names the button rather than its colour.
-  expect(within(card(choices, "Challenge Mode")).getByRole("alert").textContent).toContain('Press "Switch and lose this run" again to switch anyway');
-  fireEvent.click(within(card(choices, "Challenge Mode")).getByRole("button", { name: "Switch and lose this run" }));
+  expect(within(card(choices, "Challenge Mode")).getByRole("alert").textContent).toBe('Your Guided Mode company could not be saved, so switching now loses it. Press "Switch and lose this company" again to switch anyway, or continue that company and export it from Menu, Saves first.');
+  fireEvent.click(within(card(choices, "Challenge Mode")).getByRole("button", { name: "Switch and lose this company" }));
   expect(useGame.getState()).toMatchObject({ mode: "classic", started: true });
   expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
+});
+
+it("names the Challenge Mode run a failed save would lose when switching to Guided Mode", () => {
+  const choices = boot("classic");
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  try {
+    const guided = card(choices, "Guided Mode");
+    fireEvent.click(within(guided).getAllByRole("button")[0]);
+    expect(useGame.getState().mode).toBe("classic");
+    expect(within(guided).getByRole("alert").textContent).toBe('Your Challenge Mode run could not be saved, so switching now loses it. Press "Switch and lose this run" again to switch anyway, or continue that run and export it from Menu, Saves first.');
+    expect(within(guided).getByRole("button", { name: "Switch and lose this run" })).toBeTruthy();
+  } finally { setItem.mockRestore(); }
 });
 
 describe("analytics consent", () => {

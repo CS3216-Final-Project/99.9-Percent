@@ -166,7 +166,7 @@ it("completes accepted Monitoring inspection and recalculates without a stale sp
 
 it.each([4,5])("keeps Chapter %s summaries outside component inspections",chapter=>{
  show(chapter===4?spikeCompany(false):reliabilityCompany());
- if(chapter===5) expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Stay Online");
+ if(chapter===5) expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).toContain("Stay Online");
  open("Network");const network=screen.getByRole("dialog",{name:"Network"});
  expect(network.textContent).not.toMatch(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
  expect(dialog("Network").getByRole("button",{name:/traffic limit|Limit to/})).toBeTruthy();

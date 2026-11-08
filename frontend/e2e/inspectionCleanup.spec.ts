@@ -116,7 +116,7 @@ for(const chapter of [4,5]) test(`inspection content: Chapter ${chapter} keeps l
   await expect(monitoring).not.toContainText("Opening campaign");
   await expect(monitoring.locator(".component-inspection-metric")).toContainText(`${game.campaign!.snapshot.latencyMs.toFixed(0)} ms`);
   await closeInspection(page);
-  if(chapter===5)await expect(page.locator('.campaign-panel').getByRole("region",{name:"Chapter Progress",exact:true})).toContainText("Stay Online");
+  if(chapter===5)await expect(page.locator('.campaign-panel').getByRole("region",{name:"Guided Mode requirements",exact:true})).toContainText("Stay Online");
 });
 
 test.describe("touch inspection camera",()=>{

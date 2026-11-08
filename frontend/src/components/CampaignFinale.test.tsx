@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act as update, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newGame } from "@/sim";
 import { act, completedReliability } from "@/sim/__tests__/completionFixture";
@@ -13,7 +13,9 @@ const finale = () => screen.queryByRole("dialog", { name: "Campaign finale" });
 const scorecard = () => screen.queryByRole("dialog", { name: "Campaign complete" });
 const next = () => within(finale()!).queryByRole("button", { name: "Next" });
 const portrait = () => finale()!.querySelector<HTMLImageElement>(".dialogue-portrait")!;
-const show = (game = won) => { useGame.setState({ game, ready: true, started: true, onboarding: false, view: null }); return render(<StrictMode><CampaignOverlays/></StrictMode>); };
+/** As in the game, the Guided Mode overlays give way once the loaded company is a Challenge Mode one. */
+const Overlays = () => useGame(s => !!s.game.campaign) ? <CampaignOverlays/> : null;
+const show = (game = won) => { useGame.setState({ game, ready: true, started: true, onboarding: false, view: null }); return render(<StrictMode><Overlays/></StrictMode>); };
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -77,6 +79,128 @@ it("remembers a finished finale for the session when storage is unavailable", ()
   const game = structuredClone(won); game.campaign!.scorecard!.runId = "finale-without-storage";
   show(game); fireEvent.keyDown(finale()!, { key: "Escape" });
   cleanup(); show(game); expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
+});
+
+it("continues from the scorecard into Challenge Mode, saving the finished company first", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const go = within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" });
+  expect(document.activeElement).toBe(go);
+  fireEvent.click(go);
+  expect(useGame.getState().mode).toBe("classic");
+  expect(useGame.getState().game.campaign).toBeUndefined();
+  expect(localStorage.getItem("nn.mode.v1")).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("asks before losing a finished company that cannot be saved, then switches when asked again", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
+  expect(useGame.getState().mode).toBe("classic");
+});
+
+it("withdraws the warning once a later save succeeds, so the next switch saves the company first", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
+  // Storage recovers and the next autosave keeps the company, so it is no longer at risk.
+  setItem.mockRestore();
+  update(() => { useGame.getState().saveNow(true); });
+  expect(within(scorecard()!).queryByRole("alert")).toBeNull();
+  expect(within(scorecard()!).queryByRole("button", { name: "Switch and lose this company" })).toBeNull();
+  // A failed autosave on its own asks nothing: only a pressed switch does.
+  const failing = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  update(() => { useGame.getState().saveNow(true); });
+  expect(within(scorecard()!).queryByRole("alert")).toBeNull();
+  // The switch saves again rather than discarding the company unasked.
+  failing.mockRestore(); localStorage.removeItem("nn.campaign.save.v1");
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("says once that a finished company cannot be saved: the warning replaces the save's toasts but not other notes", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(within(scorecard()!).getByRole("alert").textContent).toContain("This company could not be saved");
+  expect(useGame.getState().toast).toBeNull();
+  // The ten-second autosave fails too, and says nothing the warning does not.
+  update(() => { useGame.getState().saveNow(true); });
+  expect(useGame.getState().toast).toBeNull();
+  update(() => useGame.getState().notify("Something else", "info"));
+  expect(useGame.getState().toast?.text).toBe("Something else");
+  // Without the warning, a failed save is told again.
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));
+  expect(scorecard()).toBeNull();
+  update(() => { useGame.getState().saveNow(true); });
+  expect(useGame.getState().toast).toMatchObject({ kind: "error", unsaved: true });
+});
+
+it("keeps Continue to Challenge Mode on a won run's scorecard reopened from the final company, opening on Close", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Inspect final company" }));
+  update(() => useGame.getState().openView("scorecard"));
+  const reopened = screen.getByRole("dialog", { name: "Company scorecard" });
+  expect(document.activeElement).toBe(within(reopened).getByRole("button", { name: "Close" }));
+  // Inspect final company returns to the company, as Close does.
+  fireEvent.click(within(reopened).getByRole("button", { name: "Inspect final company" }));
+  expect(useGame.getState().view).toBe("guidance");
+  update(() => useGame.getState().openView("scorecard"));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Company scorecard" })).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("offers no Challenge Mode from a bankrupt company's scorecard", () => {
+  const bankrupt = structuredClone(won); bankrupt.outcome = "bankrupt"; bankrupt.campaign!.scorecard!.outcome = "bankrupt";
+  show(bankrupt); update(() => useGame.getState().openView("scorecard"));
+  const card = screen.getByRole("dialog", { name: "Company scorecard" });
+  expect(within(card).queryByRole("button", { name: "Continue to Challenge Mode" })).toBeNull();
+  expect(within(card).queryByRole("button", { name: "Inspect final company" })).toBeNull();
+});
+
+it("does not switch on a held Enter that carried on from the finale", () => {
+  show(); useGame.setState({ hasRun: true });
+  while (next()) fireEvent.click(next()!);
+  fireEvent.click(within(finale()!).getByRole("button", { name: "See the scorecard" }));
+  const go = within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" });
+  expect(document.activeElement).toBe(go);
+  // A repeated key is cancelled before it can activate the button; a new press still does.
+  expect(fireEvent.keyDown(go, { key: "Enter", repeat: true })).toBe(false);
+  expect(fireEvent.keyDown(go, { key: "Enter" })).toBe(true);
+});
+
+it("drops the warning when a cloud action refuses the switch instead of the save", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  useGame.setState({ cloudBusy: true });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Switch and lose this company" }));
+  expect(scorecard()!.textContent).not.toContain("could not be saved");
+  // Its reason is the toast's alone.
+  expect(useGame.getState().toast?.text).toBe("Wait for the cloud operation before replacing this company.");
+  // Once the cloud action is over, the switch tries to save again rather than discarding the company unasked.
+  useGame.setState({ cloudBusy: false }); setItem.mockRestore();
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).step).toBe(won.campaign!.step);
+});
+
+it("waits out a cloud action without claiming the finished company could not be saved", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  useGame.setState({ cloudBusy: true });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  expect(useGame.getState().toast?.text).toBe("Wait for the cloud operation before replacing this company.");
+  expect(scorecard()!.textContent).not.toContain("could not be saved");
+  useGame.setState({ cloudBusy: false });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
 });
 
 it("preloads every celebrating portrait when the finale opens", () => {

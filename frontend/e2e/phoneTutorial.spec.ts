@@ -225,6 +225,8 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await expect.poll(() => lit(page, techTab), "the Tech tab is lit").toBe(true);
     await shot("02-tech");
     await techTab.tap();
+    // The docked strip's next instruction changes within the step, so it is announced without taking focus from Tech.
+    await expect(page.getByRole("status").filter({ hasText: /^Tutorial, step/ })).toHaveText("Tutorial, step 2 of 4: Click Scale Up.");
     await page.getByRole("button", { name: "Scale Up: Available" }).tap();
     const start = page.getByRole("button", { name: /^Start/ });
     await start.scrollIntoViewIfNeeded();

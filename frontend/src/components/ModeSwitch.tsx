@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
+import { loseWording, useModeSwitch } from "./useModeSwitch";
 
 const ABOUT: Record<GameMode, string> = {
   campaign: "Guided Mode teaches infrastructure concepts through five guided chapters of continuous play.",
@@ -20,11 +20,12 @@ const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Chal
 export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.", lockedLabel = "Finish Chapter 5 to unlock", about = ABOUT[to] }: {
   to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
 }) {
-  const switchMode = useGame((s) => s.switchMode);
+  const { unsaved: lost, switchTo } = useModeSwitch();
+  const unsaved = lost === to;
   const defaultLocked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
   const locked = lockedOverride ?? defaultLocked;
-  const [unsaved, setUnsaved] = useState(false);
   const from: GameMode = to === "campaign" ? "classic" : "campaign";
+  const lose = loseWording(from);
   return (
     <section className="menu-section" aria-label="Game mode">
       <h4>
@@ -49,18 +50,16 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
           <button
             type="button"
             className={`btn ${unsaved ? "btn-danger" : ""}`}
-            onClick={() => {
-              if (!switchMode(to, { discard: unsaved })) setUnsaved(true);
-            }}
+            onClick={(e) => switchTo(to, e.currentTarget)}
           >
             <Icon name="switch" size={20} />
-            {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
+            {unsaved ? lose.button : `Switch to ${NAME[to]}`}
           </button>
         </div>
       )}
       {unsaved && !locked && (
-        <Callout compact tone="warn" icon="alert" kicker="Not saved">
-          This run could not be saved, so switching now loses it. Press "Switch and lose this run" again to switch anyway.
+        <Callout compact tone="warn" icon="alert" kicker="Not saved" live="alert">
+          {lose.warning()}
         </Callout>
       )}
     </section>

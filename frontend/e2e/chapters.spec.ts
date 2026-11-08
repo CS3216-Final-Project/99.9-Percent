@@ -11,7 +11,7 @@ import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 // These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 
-test("chapter bar stays visible and follows the same company into Data Strategy", async ({ page }) => {
+test("chapter bar stays visible and follows the same company into Data Strategy", async ({ page }, info) => {
   await page.route("**/api/**", route => route.abort());
   await seedSave(page, dataCompany("read-heavy", false));
   await page.goto("/");
@@ -37,6 +37,9 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await bar.getByRole("button", { name: "Next: Continue to Data Strategy", exact: true }).press("Space");
   await expect(bar).toContainText("Chapter 3 of 5");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
+  // The side panel's checklist is headed with the same chapter's name.
+  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("heading", { name: /^Data Strategy/ })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("panel-data-strategy.png") });
   expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
   await page.getByRole("complementary", { name: "System metrics" }).evaluate(el => { el.scrollTop = el.scrollHeight; });
   await expect(bar).toBeInViewport();

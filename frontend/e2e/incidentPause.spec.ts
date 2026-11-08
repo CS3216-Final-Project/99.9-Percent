@@ -3,12 +3,17 @@ import { test, expect, savedGame, incidentGuide } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 import { pauseTransition } from "../src/sim/__tests__/pauseFixture";
-import { bootPause, pauseArrival } from "./incidentPause";
+import { bootPause, foldedRecoveryRequirements, pauseArrival } from "./incidentPause";
 
 // Opening's native first incident already stops; its separate negative case preserves that rule.
 for (const chapter of [2, 3, 4, 5]) test(`incident Pause: immediate running Chapter ${chapter} transition`, async ({ page, installClock , withoutRoom}, info) => {
   await withoutRoom();
   await installClock(); await pauseArrival(page, info, chapter);
+});
+
+for (const chapter of [3, 5]) test(`incident recovery: Chapter ${chapter} folds the recovery requirements into a drop-down`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
+  await installClock(); await foldedRecoveryRequirements(page, info, chapter);
 });
 
 test("incident Pause: preserves the first-incident stop and paused-save resume", async ({ page, installClock , withoutRoom}) => {

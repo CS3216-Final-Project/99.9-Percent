@@ -12,3 +12,9 @@ it("reads money, routes and cache percentages without turning a user target into
   expect(container.textContent).not.toContain("internal");
   expect(container.querySelector("pre")).toBeNull();
 });
+it("keeps a seed as recorded, in selectable code", () => {
+  render(<RecordedFields data={{ seed: 1730000000 }}/>);
+  const value = screen.getByText("Seed").nextElementSibling!;
+  expect(value.textContent).toBe("1730000000");
+  expect(value.querySelector("code")?.textContent).toBe("1730000000");
+});

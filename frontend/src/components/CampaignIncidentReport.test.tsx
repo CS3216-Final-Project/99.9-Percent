@@ -9,6 +9,7 @@ import { CampaignIncidentReport, CapacityAfterFailure } from "./CampaignIncident
 import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
+import { IncidentTimeline } from "./IncidentTimeline";
 
 let serial = 0;
 function recovery() {
@@ -59,6 +60,65 @@ it("retains every explanation, observation and event behind one collapsed techni
   for (const m of r.snapshots.filter(m => m.step >= from)) expect(within(screen.getByRole("table", { name: "Recorded incident evidence by game second" })).getByRole("rowheader", { name: String(m.step) })).toBeTruthy();
   expect(detail.querySelectorAll(".report-events li")).toHaveLength(describeEvents(r.events).filter(e => e.step >= from && e.step <= r.recoveredStep).length);
   expect(detail.querySelector("pre")).toBeNull();
+});
+it("plots the evidence window as a timeline whose selected second reads out every lane and highlights its events", () => {
+  const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
+  fireEvent.click(screen.getByText("View Technical Details"));
+  const from = reportWindowStart(r), window = r.snapshots.filter(m => m.step >= from);
+  const timeline = within(screen.getByRole("region", { name: "Incident timeline" }));
+  const slider = timeline.getByRole("slider", { name: "Incident timeline, game second" });
+  // It opens on the worst second, the one furthest past a limit: here the slowest second that also failed requests.
+  const worst = window.reduce((a, m) => (m.latencyMs > a.latencyMs || m.latencyMs === a.latencyMs && (m.serviceErrorRate ?? 0) > (a.serviceErrorRate ?? 0) ? m : a));
+  expect(worst.serviceErrorRate).toBeGreaterThan(0.01);
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(worst.step));
+  // Screen readers hear one sentence, with the servers' names capitalised as everywhere else.
+  expect(slider.getAttribute("aria-valuetext")).toBe(`Game second ${worst.step}: response time ${Math.round(worst.latencyMs).toLocaleString("en-US")} ms, service errors ${(worst.serviceErrorRate! * 100).toFixed(2)}%, `
+    + `App Servers ${worst.app.demand.toLocaleString("en-US")} of ${worst.app.capacity.toLocaleString("en-US")} req/s, Database ${worst.db.demand.toLocaleString("en-US")} of ${worst.db.capacity.toLocaleString("en-US")} ops/s`);
+  expect(slider.getAttribute("aria-valuemin")).toBe(String(window[0].step));
+  fireEvent.keyDown(slider, { key: "Home" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window[0].step));
+  fireEvent.keyDown(slider, { key: "ArrowLeft" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window[0].step));
+  // Moving to the second the incident opened highlights its marker and its line in the key.
+  for (let i = window.findIndex(m => m.step === r.openedStep); i > 0; i--) fireEvent.keyDown(slider, { key: "ArrowRight" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(r.openedStep));
+  const opened = timeline.getAllByRole("listitem").find(li => li.textContent!.includes("Incident opened"))!;
+  expect(opened.hasAttribute("data-current")).toBe(true);
+  expect(opened.querySelector(".timeline-badge")!.textContent).toBe(String(timeline.getAllByRole("listitem").indexOf(opened) + 1));
+  fireEvent.keyDown(slider, { key: "End" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(window.at(-1)!.step));
+  expect(opened.hasAttribute("data-current")).toBe(false);
+});
+it("stacks a burst of events at most three high and folds the rest at that spot into one counted marker", () => {
+  const r = recovery().campaign!.reports[0], snapshots = r.snapshots.filter(m => m.step >= reportWindowStart(r)), step = r.openedStep;
+  const events = Array.from({ length: 12 }, (_, i) => ({ id: i, step, title: `Decision ${i + 1}`, detail: null, kind: "decision" as const }));
+  const { container } = render(<IncidentTimeline snapshots={snapshots} events={events} trace={[]} openedStep={r.openedStep} recoveredStep={r.recoveredStep} focusable />);
+  const markers = [...container.querySelectorAll(".timeline-marker")];
+  expect(markers.map(m => m.textContent)).toEqual(["1", "2", "+10"]);
+  expect(new Set(markers.map(m => m.querySelector("circle")!.getAttribute("cy"))).size).toBe(3);
+  // The track is never taller than three markers: twelve stacked would make the plot 560 px tall.
+  expect(container.querySelector("svg")!.getAttribute("height")).toBe("425");
+  // The key still names every event under its own number.
+  const key = within(screen.getByRole("list", { name: "Recorded events" })).getAllByRole("listitem");
+  expect(key.map(li => li.querySelector(".timeline-badge")!.textContent)).toEqual(events.map((_, i) => String(i + 1)));
+  // Selecting their second highlights the folded marker and every event it stands for.
+  const slider = screen.getByRole("slider", { name: "Incident timeline, game second" });
+  fireEvent.keyDown(slider, { key: "Home" });
+  for (let i = snapshots.findIndex(m => m.step === step); i > 0; i--) fireEvent.keyDown(slider, { key: "ArrowRight" });
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(step));
+  expect(markers.every(m => m.hasAttribute("data-current"))).toBe(true);
+  expect(key.every(li => li.hasAttribute("data-current"))).toBe(true);
+});
+it("opens a failure whose response time stays flat on a second that failed requests, not on a calm one", () => {
+  const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
+  const r = structuredClone(c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!), window = r.snapshots.filter(m => m.step >= reportWindowStart(r));
+  window[0].serviceErrorRate = 0;
+  expect(new Set(window.map(m => m.latencyMs)).size).toBe(1);
+  render(<CampaignIncidentReport report={r} />); fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  const slider = screen.getByRole("slider", { name: "Incident timeline, game second" });
+  const opened = window.find(m => String(m.step) === slider.getAttribute("aria-valuenow"))!;
+  expect(opened.serviceErrorRate).toBe(Math.max(...window.map(m => m.serviceErrorRate ?? 0)));
+  expect(opened.serviceErrorRate).toBeGreaterThan(0.01);
 });
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
@@ -114,6 +174,33 @@ it("says the load balancer kept sending traffic to a failed server instead of cl
   const evidence = screen.getByRole("table", { name: "Recorded incident evidence by game second" });
   expect(evidence.textContent).toContain("Server 3: 800 / 0 · 0 (failed)");
   expect(evidence.textContent).not.toMatch(/Server 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
+});
+
+it("shows a Stay Online incident as its per-server table and event list, and an earlier chapter's as the timeline, whichever chapter reads it", () => {
+  // The timeline sums capacity over healthy servers while the route still feeds the failed one; the table's
+  // per-server rows and Routing column show why the errors came.
+  const game = reliabilityOutcome(true), c = game.campaign!, f = c.reliabilityStage!.fault!;
+  const stay = c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!, opening = c.reports[0];
+  expect(opening.openedStep).toBeLessThan(c.reliabilityStage!.enteredStep);
+  useGame.setState({ game });
+  const view = render(<CampaignIncidentReport report={stay} />);
+  fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  expect(screen.queryByRole("slider")).toBeNull();
+  const region = screen.getByRole("region", { name: "Recorded incident evidence" });
+  expect(region.closest(".visually-hidden")).toBeNull();
+  const table = within(region).getByRole("table", { name: "Recorded incident evidence by game second" });
+  expect(table.textContent).toContain("Server 3: 800 / 0 · 0 (failed)");
+  expect(within(table).getByRole("columnheader", { name: "Routing" })).toBeTruthy();
+  const events = describeEvents(stay.events).filter(e => e.step >= reportWindowStart(stay) && e.step <= stay.recoveredStep);
+  expect(screen.getByRole("heading", { name: "What happened, second by second" })).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Recorded events" }).querySelectorAll("li")).toHaveLength(events.length);
+  view.unmount();
+  // The company's Opening incident, read from History in Stay Online, keeps its timeline.
+  render(<CampaignIncidentReport report={opening} />);
+  fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
+  expect(screen.getByRole("slider", { name: "Incident timeline, game second" })).toBeTruthy();
+  expect(screen.getByRole("table", { name: "Recorded incident evidence by game second" }).closest(".visually-hidden")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "What happened, second by second" })).toBeNull();
 });
 
 it.each([

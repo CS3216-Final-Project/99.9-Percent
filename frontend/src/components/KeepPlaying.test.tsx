@@ -35,6 +35,8 @@ it("reopens a run that secured its Series A on its report, and keeps the same co
   fireEvent.click(within(home()).getByRole("button", { name: "See your results" }));
 
   const report = screen.getByRole("dialog", { name: "Series A secured" });
+  // The seed stays copyable, in code, like the menu's.
+  expect(within(report).getByText(String(won.seed), { selector: "code" })).toBeTruthy();
   const keep = within(report).getByRole("button", { name: "Keep playing" });
   expect(document.activeElement).toBe(keep);
   fireEvent.click(keep);

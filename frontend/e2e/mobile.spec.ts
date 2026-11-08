@@ -9,7 +9,7 @@ import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { recoveryJourney } from "./incidentRecovery";
-import { pauseArrival } from "./incidentPause";
+import { foldedRecoveryRequirements, pauseArrival } from "./incidentPause";
 import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
@@ -375,7 +375,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   const requirements = panel.getByRole("region", { name: "Guided Mode requirements", exact: true });
-  await expect(requirements.getByRole("heading", { name: /Chapter requirements/ })).toBeVisible();
+  await expect(requirements.getByRole("heading", { name: /^Opening/ })).toBeVisible();
   const requirementBox = (await requirements.boundingBox())!;
   const latencyBox = (await panel.getByText("Latency · ms", { exact: true }).boundingBox())!;
   expect(requirementBox.y + requirementBox.height).toBeLessThanOrEqual(latencyBox.y);
@@ -429,6 +429,11 @@ test("recovery conditions are visible without a tooltip, and tapping a button le
   await mute.tap();
   await expect(tip).toBeHidden();
   await expect(mute).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a Chapter 3 incident's recovery requirements open and close with a tap", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
+  await installClock(); await foldedRecoveryRequirements(page, info, 3, true);
 });
 
 test("selects scaling instances through room and evidence on touch",async({page})=>{
@@ -504,7 +509,7 @@ test("traffic spikes: touch selects an instance after retirement and re-provisio
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
 
-test("completed campaign: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {reliabilityOutcome}=await import("../src/game/__fixtures__/reliabilityOutcome");await page.route("**/api/**",r=>r.abort());await seedSave(page,reliabilityOutcome());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("dialog",{name:"Reliability outcome",exact:true}).getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Stay Online");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Stay Online"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("Campaign complete");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+test("completed campaign: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {reliabilityOutcome}=await import("../src/game/__fixtures__/reliabilityOutcome");await page.route("**/api/**",r=>r.abort());await seedSave(page,reliabilityOutcome());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("dialog",{name:"Reliability outcome",exact:true}).getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Stay Online");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Stay Online"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("Campaign complete");await expect(page.getByRole("dialog",{name:"Company scorecard",exact:true}).getByRole("button",{name:"Continue to Challenge Mode",exact:true})).toBeVisible();await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
 for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.

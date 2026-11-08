@@ -47,6 +47,9 @@
   --warn-ink: #a65400;
   --critical: #ff4d5e;
   --critical-ink: #c41d33;
+  /* Destructive buttons: white text keeps at least 4.5:1 at rest, hovered and pressed. */
+  --danger-hover: #d02a40;
+  --danger-active: #a3172a;
   /* Critical text on the caption's dark band. */
   --critical-caption: #ffb4bb;
 
@@ -125,8 +128,44 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The game reads as an app rather than a page: clicking, dragging and long-pressing through panels, dialogues and
+   the room never highlight their text. What a player types, and a seed, run, session or build ID they may want to
+   copy (always in code), stay selectable. */
 body {
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]),
+code {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* An ID is copied whole: one click, double-click or long press on its chip selects exactly the chip's value, never
+   one hyphen-separated part of it or the chip beside it. */
+code {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+/* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. The chip
+   moves to the next line whole rather than splitting an ID, and breaks only an ID wider than the line. Its line
+   height keeps a line holding a chip as tall as the lines around it. */
+code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  padding: 1px 6px;
+  font-weight: 600;
+  background: var(--control-inset);
+  border-radius: 3px;
 }
 
 h1,
@@ -1738,12 +1777,12 @@ button:disabled {
 }
 
 .btn-danger {
-  background: var(--critical);
+  background: var(--critical-ink);
   color: #fff;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #ff6b79;
+  background: var(--danger-hover);
 }
 
 .btn-quiet {
@@ -2166,9 +2205,15 @@ button:disabled {
     transition: height 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out, content-visibility 0.24s allow-discrete;
   }
 
+  /*
+   * Opening shows the contents at once and tweens only the height and fade. A discrete content-visibility transition
+   * would keep them hidden (out of the accessibility tree and find-in-page) until the browser draws the slide's first
+   * frame, which a busy page can delay for seconds. Closing still keeps them until the slide has folded.
+   */
   .more[open]::details-content {
     height: auto;
     opacity: 1;
+    transition-property: height, opacity;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3749,6 +3794,26 @@ button:disabled {
   margin-right: auto;
 }
 
+/* The finished campaign's two ways to look back share a row, and Continue to Challenge Mode takes the full row under
+   them; where they cannot share one (a phone), every action takes its own full row. */
+.modal:has(.campaign-complete-foot) {
+  width: min(560px, 100%);
+}
+
+.campaign-complete-foot > .btn {
+  flex: 1 1 auto;
+}
+
+.campaign-complete-foot > :is(.btn-primary, .btn-danger) {
+  flex-basis: 100%;
+}
+
+/* The unsaved warning keeps its own room between the scrolling report and the actions. */
+.campaign-recovery-report .modal-body > .callout {
+  flex: none;
+  margin-top: 12px;
+}
+
 .modal-body h4 {
   margin-top: 18px;
 }
@@ -3971,12 +4036,8 @@ button:disabled {
 
 .menu-seed code {
   margin: 0 4px;
-  padding: 1px 6px;
-  font-family: var(--font-num);
-  font-weight: 600;
   color: var(--on-night);
   background: var(--night-3);
-  border-radius: 3px;
 }
 
 .menu-resume {
@@ -5073,6 +5134,25 @@ button:disabled {
   box-shadow: var(--lift);
 }
 
+/* A dialog that reaches down to the toast takes it as its last row, so it covers none of the dialog's actions. */
+.modal > .toast-inline {
+  position: static;
+  flex: none;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding: 8px 18px 14px;
+}
+
+.modal > .toast-inline .callout {
+  box-shadow: none;
+}
+
+/* The control kept in view above it keeps the body's own margin. */
+.modal:has(> .toast-inline) :focus {
+  scroll-margin-block: 18px;
+}
+
 /* ---------------------------------------------------------------- */
 /* Smaller screens                                                   */
 /* ---------------------------------------------------------------- */
@@ -5512,9 +5592,11 @@ button:disabled {
 }
 /* The shell that grows from the pressed button onto the card while it opens (InspectionReveal.tsx). */
 .inspection-morph { position: fixed; box-sizing: border-box; margin: 0; border: 1px solid var(--control-edge); box-shadow: var(--lift); pointer-events: none; }
+/* The details fade in without moving: a transform would make them the containing block of a purchase preview opened
+   from their actions (Monitoring's Deploy Health Checks), pinning the preview to the details instead of the screen. */
 .inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes inspection-details-open {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; }
 }
 /* Without motion the disc swaps faces in place instead of turning over. */
 @media (prefers-reduced-motion: reduce) {

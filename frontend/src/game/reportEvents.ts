@@ -1,5 +1,5 @@
 import type { CampaignPostmortem, Intervention, TraceEvent } from "@/sim/campaignTypes";
-import { serverName } from "@/sim";
+import { serverName, type EventKind } from "@/sim";
 const REPORT_LEAD_SECONDS = 3;
 export const ACTION_NAMES: Record<Intervention, string> = {
   "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
@@ -59,18 +59,32 @@ function change(label: string, before: unknown, after: unknown, unit = "") {
   return `${label} ${num(before)} to ${num(after)}${unit}`;
 }
 
-export interface ReportEvent { id: number; step: number; title: string; detail: string | null }
+export interface ReportEvent { id: number; step: number; title: string; detail: string | null; kind: EventKind }
+
+/** How History's feed and a report's timeline mark an event. */
+export function eventKind(e: TraceEvent): EventKind {
+  const type = e.type;
+  if (type === "autoscaler-blocked") return e.data.reason ? "warning" : "success";
+  if (type.startsWith("autoscale-")) return type.includes("cancelled") ? "warning" : "decision";
+  return type === "settlement" ? "finance"
+  : /incident-opened|failure-started|bankruptcy/.test(type) ? "incident"
+  : /rejected|blocked|cancelled|superseded/.test(type) ? "warning"
+  : /recovered|restored|qualified|completed/.test(type) ? "success"
+  : /milestone|awarded|stage-entered|unlocked/.test(type) ? "milestone"
+  : /action-|acknowledged|enabled|reserved|decided/.test(type) ? "decision"
+  : "info";
+}
 
 /**
  * One readable line per recorded event, never raw engine fields. Per-second metrics are dropped because the
- * evidence table already shows them.
+ * report's timeline already plots them.
  */
 export function describeEvents(events: TraceEvent[], context: TraceEvent[] = events): ReportEvent[] {
   const requested = new Map(context.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
   return events.flatMap(e => {
     const d = e.data;
     const automatic = d.source === "autoscaler" ? "Autoscaler: " : "";
-    const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null }];
+    const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null, kind: eventKind(e) }];
     switch (e.type) {
       case "metrics": return [];
       case "action-requested": return line(`${automatic}${actionName(d.type)} requested`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
