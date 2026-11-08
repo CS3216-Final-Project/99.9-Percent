@@ -4,9 +4,95 @@
 .campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
 .campaign-recovery-report .modal-foot { flex: none; }
-.campaign-incident-report > section { margin-block: 10px; }
-.campaign-incident-report > section h3 { margin-bottom: 4px; }
-.campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
+/* A report reads as a chat: the colleague of the report's chapter asks each question from the right, and the player,
+   who ran the company through it, answers from the left. The summary after the first answer (capacity after a failure)
+   joins the conversation, its heading as a question and its readings and story as answers. A small picture of the
+   speaker sits beside each bubble, in a gutter kept only when the report has speakers. */
+.campaign-incident-report { --report-face: 30px; --report-side: 0px; }
+.campaign-incident-report[data-speaker] { --report-side: calc(var(--report-face) + 8px); }
+:is(.campaign-incident-report, .report-lesson-summary) > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
+.report-lesson-summary { display: contents; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
+  position: relative;
+  /* Neither side ever reaches past 75% of the report, so the left/right conversation stays readable. */
+  max-width: calc(75% - var(--report-side));
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+:is(.campaign-incident-report, .report-lesson-summary) > section h3 {
+  align-self: flex-end;
+  margin-right: var(--report-side);
+  border-bottom-right-radius: 3px;
+  background: var(--ink);
+  color: var(--on-night);
+  box-shadow: 0 2px 6px rgb(29 24 52 / .14);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  transform-origin: bottom right;
+}
+:is(.campaign-incident-report, .report-lesson-summary) > section > :is(p, dl) {
+  align-self: flex-start;
+  margin-left: var(--report-side);
+  border: 1px solid var(--control-edge);
+  border-bottom-left-radius: 3px;
+  background: var(--paper-2);
+  color: var(--ink);
+  transform-origin: bottom left;
+}
+/* A table of readings fills its bubble. A reading too long to share a line with its label drops below it, so the label
+   never narrows to a letter or a word a line. */
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: 100%; padding-block: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl .row { flex-wrap: wrap; row-gap: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl dt { flex: 1 1 8em; text-wrap: pretty; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl dd { margin-left: auto; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl .row:last-child { border-bottom: 0; }
+/* On a phone three quarters of the report leaves a bubble a few words wide, so a bubble only keeps clear of the other
+   speaker's picture there, and the pictures shrink. */
+@media (max-width: 480px) {
+  .campaign-incident-report { --report-face: 24px; }
+  :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) { max-width: calc(100% - 2 * var(--report-face) - 16px); }
+}
+/* Each speaker's picture sits level with the bottom of the bubble, on its outer side; a run of answers shows it once. */
+:is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(h3, p, dl)::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: var(--report-face);
+  height: var(--report-face);
+  border: 1px solid var(--control-edge);
+  border-radius: 50%;
+  background: var(--paper) no-repeat;
+  pointer-events: none;
+}
+:is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > h3::before {
+  right: calc(-1 * var(--report-side));
+  background-image: var(--report-colleague);
+  background-position: center 12%;
+  background-size: 130%;
+}
+:is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(p, dl)::before {
+  /* The bubble's own border sits outside its padding box, so the picture steps out by that pixel too. */
+  left: calc(-1 * var(--report-side) - 1px);
+  bottom: -1px;
+  background-image: var(--report-player);
+  background-position: center;
+  background-size: 100%;
+}
+:is(.campaign-incident-report[data-speaker], [data-speaker] .report-lesson-summary) > section > :is(p, dl):has(+ :is(p, dl))::before { content: none; }
+/* As the report pops up, each question and then its answer pops up from its side like a chat message. */
+@media (prefers-reduced-motion: no-preference) {
+  .campaign-recovery-report :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
+    animation: report-line-rise .36s cubic-bezier(.16, 1, .3, 1) both;
+    animation-delay: calc(.15s + (var(--turn, 0) + var(--step, 0)) * .12s);
+  }
+  /* The summary takes its turn as one block; its readings and story follow its heading. */
+  .report-lesson-summary > section > dl { --step: 1; }
+  .report-lesson-summary > section > p { --step: 2; }
+}
+@keyframes report-line-rise { from { opacity: 0; transform: translateY(12px) scale(.94); } }
 .campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
 .campaign-recovery-report .modal-foot { padding-top: 10px; }
 .campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }
@@ -37,7 +123,9 @@
 .report-capacity h3 { margin-bottom: 4px; }
 .report-capacity p { margin-block: 6px 0; line-height: 1.5; }
 /* A reading stays on one line; its label wraps instead, so "2,400 req/s" never splits on a phone. */
-.report-capacity .rows dd { white-space: nowrap; }
+.report-capacity .rows dd, .spike-target dd { white-space: nowrap; }
+/* A spike test's target keeps its label whole; on a narrow phone the reading drops below it instead. */
+.spike-target dt { white-space: nowrap; }
 .report-explanations { margin: 4px 0 8px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.5; max-width: 75ch; }
 .report-explanations li::marker { color: var(--text-soft); }
 
@@ -70,3 +158,5 @@
 .history-report > header h3:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 .history-report > header p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 4px 0 0; font-size: var(--text-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .history-report p, .history-report h4, .history-report dl.rows { max-width: 75ch; }
+/* A report's lone action, such as Continue company, sits on the right like every other dialog's primary action. */
+.campaign-recovery-report .modal-foot > .btn:only-child { margin-left: auto; }

@@ -75,15 +75,24 @@ describe("the end of each chapter", () => {
     expect(JSON.stringify(g)).toBe(before);
   });
 
-  it("offers Grow the Company after the reliability outcome, and names what a stayed company still waits for", () => {
+  it("offers Complete campaign after the reliability outcome, and names what a stayed company still waits for", () => {
     const g = reliabilityOutcome();
     const end = chapterEnd(g)!;
-    expect(end).toMatchObject({ chapter: "reliability", label: "Continue to Grow the Company", blockers: [], next: { name: "Grow the Company" } });
-    expect(apply(g, end.proceed!).campaign!.combinedStage).toBeTruthy();
+    expect(end).toMatchObject({ chapter: "reliability", final: true, label: "Complete campaign", blockers: [], next: { name: "Complete campaign" } });
+    const won = apply(g, end.proceed!);
+    expect(won).toMatchObject({ phase: "ended", outcome: "won" });
+    expect(won.campaign!.scorecard).toMatchObject({ outcome: "won", capturedStep: g.campaign!.step });
+    expect(chapterEnd(won)).toBeNull();
+    expect(chapterAdvance(won)).toBeNull();
+    // A stayed company keeps operating, with Complete campaign on offer from Next.
+    const stayed = apply(g, end.stay);
+    expect(stayed.phase).toBe("management");
+    expect(chapterAdvance(stayed)).toMatchObject({ label: "Complete campaign", action: { type: "complete_campaign" }, ready: true, blockers: [] });
     // A change queued after staying keeps Next on offer, disabled with the reason.
-    const queued = act(apply(g, end.stay), { type: "add_server" });
-    expect(chapterAdvance(queued)).toMatchObject({ label: "Continue to Grow the Company", ready: false, blockers: ["queued changes have finished"] });
-    expect(applyAction(queued, { type: "enter_combined" }).ok).toBe(false);
+    const queued = act(stayed, { type: "add_server" });
+    expect(chapterAdvance(queued)).toMatchObject({ label: "Complete campaign", ready: false, blockers: ["queued changes have finished"] });
+    expect(applyAction(queued, { type: "complete_campaign" }).ok).toBe(false);
+    expect(queued.phase).toBe("management");
   });
 
   it("holds Continue while a change queued before the outcome is still installing", () => {

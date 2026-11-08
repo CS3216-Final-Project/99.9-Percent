@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { BALANCE, type GameState } from "@/sim";
+import { useMemo } from "react";
+import { BALANCE, canKeepPlaying, weekLimit, type GameState } from "@/sim";
 import { campaignChapters } from "@/game/campaignChapters";
 import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { num } from "@/game/format";
 import type { IconName } from "./icons";
+import { useModeSwitch } from "./useModeSwitch";
 
 /** What a mode's card says about its saved game. Nothing here changes a save. */
 export interface Summary {
@@ -40,8 +41,12 @@ export function campaignSummary(game: GameState | null, tutorialDone: boolean): 
 
 export function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
+  // A run that has just secured its Series A reopens on its report, where it can still keep playing.
+  if (canKeepPlaying(game)) return { progress: "Series A secured", resumable: true, ended: false, tutorialDone, continueLabel: "See your results" };
   const ended = game.phase === "ended";
-  return { progress: ended ? (game.outcome === "won" ? "Last company reached the goal" : "Last company closed") : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
+  const limit = weekLimit(game);
+  const week = limit === null ? `Week ${game.turn}: Series A secured` : `Week ${game.turn} of ${limit}`;
+  return { progress: ended ? "Last company closed" : week, resumable: !ended, ended, tutorialDone,
     continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}` };
 }
 
@@ -75,7 +80,7 @@ export type ModeInfo = { name: string; icon: IconName; pace?: string; about: str
 export const MODES: Record<GameMode, ModeInfo> = {
   campaign: {
     name: "Guided Mode", icon: "server",
-    about: "Launch Week teaches the controls, game time and finances as your service opens, then six infrastructure chapters follow. Inspect problems, upgrade servers and pause whenever you need.",
+    about: "Launch Week teaches the controls, game time and finances as your service opens, then five infrastructure chapters follow. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
     name: "Challenge Mode", icon: "week",
@@ -86,23 +91,17 @@ export const MODES: Record<GameMode, ModeInfo> = {
 /** Guided Mode's pitch once its company has started: finish Launch Week, then the chapters. */
 export function campaignAbout(summary: Summary): string {
   if (!summary.resumable) return MODES.campaign.about;
-  if (summary.chapter === 0) return "Finish Launch Week to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
-  return "Work through six infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
+  if (summary.chapter === 0) return "Finish Launch Week to learn the controls, game time and finances, then tackle five infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
+  return "Work through five infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
 }
 
 /** A home screen's mode controls: play or continue a mode, start a new one and replay its tutorial. */
 export function useModeLauncher(summary: (mode: GameMode) => Summary) {
-  const [unsaved, setUnsaved] = useState<GameMode | null>(null);
+  const { unsaved, switchTo } = useModeSwitch();
 
   /** Run `then` in mode `m`, switching first when it is not the loaded mode. */
   const inMode = (m: GameMode, then?: () => void) => {
-    const s = useGame.getState();
-    if (m !== s.mode && !s.switchMode(m, { discard: unsaved === m })) {
-      if (!useGame.getState().cloudBusy) setUnsaved(m);
-      return;
-    }
-    setUnsaved(null);
-    then?.();
+    if (switchTo(m)) then?.();
   };
   const fresh = () => {
     const s = useGame.getState();

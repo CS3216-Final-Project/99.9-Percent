@@ -7,6 +7,7 @@ import {
   selfHealingFleet,
   serverCapacity,
   utilisation,
+  promoSpike,
   weeklyRevenue,
 } from "./derive";
 import { revertDeploy, rollbackTarget } from "./releases";
@@ -86,7 +87,7 @@ function contributingFactors(s: GameState, seed: IncidentSeed, cause: IncidentCa
   const users = (n: number) => Math.round(n).toLocaleString("en-US");
 
   if (seed.type === "app_overload" || seed.type === "db_saturation") {
-    for (const id of cause.promos) out.push(`${PROMOS[id].name} added +${pct(PROMOS[id].spike)} traffic.`);
+    for (const id of cause.promos) out.push(`${PROMOS[id].name} added +${pct(promoSpike(s, id))} traffic.`);
     if (pending?.surgeLabel) out.push(`${pending.surgeLabel}: +${pct(pending.surgeMult - 1)} traffic.`);
   }
 
@@ -370,7 +371,7 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
       break;
     }
     case "growth": {
-      const promos = c.promos.map((id) => `${PROMOS[id].name} (+${pct(PROMOS[id].spike)})`);
+      const promos = c.promos.map((id) => `${PROMOS[id].name} (+${pct(promoSpike(s, id))})`);
       text = promos.length > 0 ? `Running: ${promos.join(", ")}.` : c.surgeLabel ? `No campaigns. ${c.surgeLabel}.` : "No campaigns running.";
       break;
     }

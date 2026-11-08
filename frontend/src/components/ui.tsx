@@ -484,7 +484,12 @@ export function Modal({
   icon?: { kind: ConceptKind; name: IconName };
 }) {
   const dialog=useRef<HTMLDivElement>(null);
+  // Enter and Space pressed down inside this dialog and not yet released. Any other repeat of them is the press that
+  // opened it, still held, and its default action is cancelled: auto-repeat would otherwise press whatever the dialog
+  // focused, such as Close, which hands focus back to the opener for the next repeat to open it again.
+  const held=useRef(new Set<string>());
   useEffect(()=>{
+    held.current.clear();
     const previous=document.activeElement as HTMLElement|null;
     const node=dialog.current;
     ((initialFocus ? node?.querySelector<HTMLElement>(initialFocus) : null) ?? node?.querySelector<HTMLElement>("[data-autofocus]") ?? node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]"))?.focus();
@@ -494,6 +499,10 @@ export function Modal({
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}${className ? ` ${className}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
         if ((e.target as Element).closest('[role="dialog"]') !== e.currentTarget) return;
+        if(e.key==="Enter"||e.key===" "){
+          if(!e.repeat)held.current.add(e.key);
+          else if(!held.current.has(e.key))e.preventDefault();
+        }
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
           const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,summary,[tabindex="0"]')??[]).filter(node=>{
@@ -507,7 +516,7 @@ export function Modal({
           if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
           else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
         }
-      }}>
+      }} onKeyUp={e=>held.current.delete(e.key)}>
         <header className="modal-head">
           <h2>
             {icon && <Concept kind={icon.kind} icon={icon.name} />}

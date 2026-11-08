@@ -2,12 +2,9 @@ import type { Page, TestInfo } from "@playwright/test";
 import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
-import { combinedCompany, finishRound, finishedCompany } from "../src/sim/__tests__/combinedFixture";
 
-export type ReportCase = "prevention" | "spikes" | "growth" | "completion";
+export type ReportCase = "prevention" | "spikes";
 function fixture(kind: ReportCase) {
-  if (kind === "completion") return finishedCompany();
-  if (kind === "growth") return finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
   if (kind === "spikes") {
     let game = act(spikeCompany(false), { type: "set_traffic_limit", enabled: true });
     for (let i = 0; i < 100 && game.campaign!.spikeStage!.completedStep == null; i++) game = tick(game);
@@ -21,12 +18,12 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   const game = fixture(kind);
   await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
-  const title = { prevention: "Prevention review", spikes: "Spike response handled", growth: "Growth outcome", completion: "Final campaign review" }[kind];
+  const title = { prevention: "Prevention review", spikes: "Spike response handled" }[kind];
   const dialog = page.getByRole("dialog", { name: title, exact: true });
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
   const details = dialog.locator("details");
   await expect(details).toHaveCount(1); await expect(details).not.toHaveAttribute("open");
-  const button = dialog.getByRole("button", { name: kind === "completion" ? "Complete campaign" : kind === "spikes" ? "Stay in this chapter" : "Continue company", exact: true });
+  const button = dialog.getByRole("button", { name: kind === "spikes" ? "Stay in this chapter" : "Continue company", exact: true });
   await expect(button).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
   if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "rejected"]);
@@ -44,8 +41,6 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   expect(after.campaign!.runId).toBe(game.campaign!.runId);
   expect(after.campaign!.step).toBe(game.campaign!.step);
   expect(after.campaign!.cashCents).toBe(game.campaign!.cashCents);
-  if (kind === "completion") expect(after.outcome).toBe("won");
-  else if (kind === "growth") expect(after.campaign!.combinedStage!.completedRounds.at(-1)!.acknowledged).toBe(true);
-  else if (kind === "spikes") expect(after.campaign!.spikeStage!.acknowledged).toBe(true);
+  if (kind === "spikes") expect(after.campaign!.spikeStage!.acknowledged).toBe(true);
   else expect(after.campaign!.openingPrevention!.outcome!.acknowledged).toBe(true);
 }

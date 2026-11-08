@@ -15,7 +15,7 @@ export interface ComponentSnapshot {
 }
 export interface Snapshot {
     /** Missing on retained historical opening snapshots. */
-    version?: 3 | 4 | 5 | 6 | 7;
+    version?: 3 | 4 | 5 | 6;
     reliability?: ReliabilityObservation;
     spikes?: SpikeObservation;
     data?: DataSnapshot;
@@ -53,10 +53,25 @@ export interface Autoscaler {
  activatedStep: number; enabled: boolean; highSteps: number; lowSteps: number; cooldownUntil: number;
  managedAppIds: string[]; joiningAppId: string | null; expectedRouting: string; blockedReason: string | null;
 }
+/** One traffic spike's served share; version-2 stages grade every spike after the first. */
+export interface SpikePulse {
+ pulse: number; startStep: number; endStep: number; graded: boolean;
+ incoming: number; served: number; rejected: number; failed: number;
+ /** Observations in which a routed server, or the database, received more than its capacity. */
+ appOverloadSteps: number; dbOverloadSteps: number;
+ result: null | "practice" | "passed" | "failed";
+ /** A failed test waits for its debrief before time moves again. */
+ reviewed: boolean;
+}
 export interface SpikeStage {
- id: "traffic-spikes"; version: 1; configuration: string; enteredStep: number;
+ id: "traffic-spikes"; version: 1 | 2; configuration: string; enteredStep: number;
+ /** Start and end step of each spike in pairs; a failed version-2 test appends the next pair. */
  deadlines: number[]; consumed: string[]; researchEarned: 1; researchSpent: 0 | 1;
  controller: Autoscaler | null; baselineStableSteps: number; completedStep: number | null; acknowledged: boolean;
+ /** Version 2 only: the spike demand chosen for the company's workload, and each spike's result. */
+ peak?: number; pulses?: SpikePulse[];
+ /** Version 2 only: routed capacity, and the part of it left unused, summed over observations outside every spike. */
+ calm?: { capacity: number; idle: number };
 }
 export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }
@@ -70,7 +85,7 @@ export interface InstanceSnapshot extends ComponentSnapshot {
     demandRate: number; demandCount: number; processingBudget: number;
     health?: AppInstance["health"]; detectedHealth?: AppInstance["detectedHealth"]; role?: AppInstance["role"]; configured?: boolean;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app" | "health-checks" | "create-spare" | "reserve-spare" | "release-spare" | "failover" | "promote-spare" | "restore-app" | "promotion";
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app" | "health-checks" | "create-spare" | "reserve-spare" | "release-spare" | "failover" | "promote-spare" | "restore-app";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -122,8 +137,9 @@ export interface CampaignIncident {
     id: string;
     openedStep: number;
     /** An uncancelled scheduled action engaged at or after this step is the incident's recorded
-     * response; stability alone cannot close the incident until one exists. Undefined only for
-     * incidents replayed from saves recorded before the requirement, which still self-resolve. */
+     * response; stability alone cannot close the incident until one exists. Undefined for incidents
+     * replayed from saves recorded before the requirement and for incidents opened during graded
+     * Traffic Spikes, which both self-resolve. */
     responseDueFrom?: number;
     stableSteps: number;
     snapshots: Snapshot[];
@@ -149,34 +165,21 @@ export interface OpeningPrevention {
         snapshots: Snapshot[]; rejectedDemand: number; setupCents: number };
 }
 export interface ServiceMeasurement {
- scope:"full-run"|"since-upgrade"|"combined-stage"; fromStep:number; lastStep:number;
+ scope:"full-run"|"since-upgrade"; fromStep:number; lastStep:number;
  eligibleSteps:number; healthySteps:number; degradedSteps:number; longestDegradedSteps:number;
 }
 export interface CampaignScorecard {
  runId:string; seed:number; outcome:"won"|"bankrupt"; capturedStep:number;
- users:number; finalUserTarget:number|null; cashCents:number; revenueCents:number; pendingRevenueCents:number;
- infrastructureSetupCents:number; infrastructureOperatingCents:number; salaryCents:number; promotionCents:number;
+ cashCents:number; revenueCents:number; pendingRevenueCents:number;
+ infrastructureSetupCents:number; infrastructureOperatingCents:number; salaryCents:number;
  rejectedDemand:number; opportunityCents:number; failedDemand:number; incidentCount:number; recurringCents:number;
- measurement:ServiceMeasurement; combinedMeasurement:ServiceMeasurement|null;
+ measurement:ServiceMeasurement;
  wholeRunUptime:number|null; wholeRunLargestOutage:number|null;
  ownedTechIds:string[]; deployedTechIds:string[];
  architecture:{apps:AppInstance[];routing:Routing;loadBalancer:boolean;dbCapacity:number;readCache:ReadCache|null;
   controller:Autoscaler|null;checksStep:number|null;failover:ReliabilityStage["failover"]};
 }
-export interface CombinedRound {
- id:string;index:number;scenario:import("./scenarios/combinedCampaign").CombinedScenario;
- scheduledStep:number;startStep:number;endStep:number;users:number;baseline:number;
- startedStep:number|null;pressureEndedStep:number|null;fault:ReliabilityFault|null;
- stableSteps:number;completedStep:number|null;acknowledged:boolean;
- rejectedBefore:number;setupBefore:number;observations:Snapshot[];
-}
-export interface CombinedStage {
- id:"combined-campaign";version:1;configuration:string;enteredStep:number;source:"seeded"|"evaluation";
- finalUserTarget:number;users:number;sequence:import("./scenarios/combinedCampaign").CombinedScenario[];
- nextRoundIndex:number;currentRound:CombinedRound|null;completedRounds:CombinedRound[];
- readinessSteps:number;finalStableSteps:number;targetReachedStep:number|null;
- finalReview:CampaignScorecard|null;acknowledged:boolean;service:ServiceMeasurement;
-}
+/** Launch Week's scripted promotion surge. */
 export interface CampaignPromotion {
  actionId:string;requestedStep:number;activationStep:number;activatedStep:number|null;
  endStep:number;endedStep:number|null;cooldownUntil:number;costCents:number;
@@ -201,7 +204,6 @@ export interface Campaign {
     /** Boundary of observations made by the deployed Phase 1/2 engine. */
     foundation?: { step: number; inputs: number };
 
-    combinedStage?:CombinedStage|null;
     scalingConsent?:{policyVersion:1;acceptedStep:number}|null;
     promotion?:CampaignPromotion|null;
     launchWeek?:LaunchWeek|null;

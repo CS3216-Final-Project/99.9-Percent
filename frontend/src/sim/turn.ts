@@ -3,6 +3,7 @@ import { BALANCE, PROMOS } from "./balance";
 import {
   arpu,
   autoscaleServers,
+  canKeepPlaying,
   churnRate,
   clamp,
   costs,
@@ -10,11 +11,14 @@ import {
   freeEngineers,
   latencyFor,
   organicRate,
+  promoSpike,
   promoUsers,
+  rpsPerUser,
   selfHealingFleet,
   utilisation,
   velocity,
 } from "./derive";
+import { appProfile } from "./appProfiles";
 import { createIncident, tickIncident, type IncidentSeed } from "./incidents";
 import { autoPostmortem, buildPostmortem } from "./postmortem";
 import { releaseTitle } from "./releases";
@@ -250,7 +254,7 @@ export function advanceTurn(prev: GameState): GameState {
   for (const id of s.activePromos) {
     const n = promoUsers(s, id);
     gained += n;
-    spike *= 1 + PROMOS[id].spike;
+    spike *= 1 + promoSpike(s, id);
     notes.push(`${PROMOS[id].name} brought in ${num(n)} new users.`);
   }
   let surgeLabel: string | undefined;
@@ -266,7 +270,7 @@ export function advanceTurn(prev: GameState): GameState {
   s.users += gained;
 
   const noise = 1 + rand(s) * BALANCE.trafficNoise;
-  const peakRps = s.users * BALANCE.rpsPerUser * spike * surgeMult * noise;
+  const peakRps = s.users * rpsPerUser(s) * spike * surgeMult * noise;
 
   const failure = resolveHostHealth(s);
   let unhandled: HostFailure | null = null;
@@ -398,7 +402,9 @@ function finishTurn(s: GameState): void {
   s.totals.costs += c.total;
 
   const worstUtil = Math.min(1, Math.max(peakU.appUtil, peakU.dbUtil));
-  const latencyPenalty = clamp((worstUtil - 0.7) / 0.3, 0, 1) * BALANCE.growth.latencyPenaltyMax;
+  // Users start to notice slowness at the profile's knee, and the full penalty arrives at saturation.
+  const knee = appProfile(s).latencyKnee;
+  const latencyPenalty = clamp((worstUtil - knee) / (1 - knee), 0, 1) * BALANCE.growth.latencyPenaltyMax;
   const errorPenalty = Math.min(BALANCE.growth.errorPenaltyMax, sustainedError * BALANCE.growth.errorPenaltyMult);
   const repairPenalty = s.tasks.some((t) => t.repairCode === "data_repair") ? BALANCE.growth.dataRepairPenalty : 0;
   const target = BALANCE.growth.satisfactionCeiling - latencyPenalty - errorPenalty - repairPenalty;
@@ -471,12 +477,15 @@ function finishTurn(s: GameState): void {
   if (s.cash < 0) {
     s.outcome = "bankrupt";
     logEvent(s, "incident", "The company has run out of cash.");
-  } else if (s.users >= BALANCE.targetUsers) {
-    s.outcome = "won";
-    logEvent(s, "milestone", `You reached ${num(BALANCE.targetUsers)} users. The Series A is yours.`);
-  } else if (s.turn >= BALANCE.maxTurns) {
-    s.outcome = "deadline";
-    logEvent(s, "info", "The Series A meeting arrived before you reached the target.");
+  } else if (s.seriesAWeek === undefined) {
+    // Past the Series A there is no target or deadline left; only cash can end the run.
+    if (s.users >= BALANCE.targetUsers) {
+      s.outcome = "won";
+      logEvent(s, "milestone", `You reached ${num(BALANCE.targetUsers)} users. The Series A is yours.`);
+    } else if (s.turn >= BALANCE.maxTurns) {
+      s.outcome = "deadline";
+      logEvent(s, "info", "The Series A meeting arrived before you reached the target.");
+    }
   }
 
   // Set up the next week.
@@ -517,5 +526,16 @@ export function acknowledgeReview(prev: GameState): GameState {
   const s = clone(prev);
   s.reviewId = null;
   s.phase = s.outcome ? "ended" : "management";
+  return s;
+}
+
+/** After the Series A, carry the same company on with no deadline. Null when the run has not just been won. */
+export function keepPlaying(prev: GameState): GameState | null {
+  if (!canKeepPlaying(prev)) return null;
+  const s = clone(prev);
+  s.seriesAWeek = s.totals.weeks;
+  s.outcome = null;
+  s.phase = "management";
+  logEvent(s, "milestone", "With the Series A banked, the company keeps growing. Only running out of cash ends the run now.");
   return s;
 }

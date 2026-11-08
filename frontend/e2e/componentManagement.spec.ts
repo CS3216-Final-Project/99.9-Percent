@@ -57,11 +57,12 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await expect(popup).toBeInViewport({ratio:1});await page.screenshot({path:info.outputPath(`fleet-${width}.png`)});
     await popup.getByRole("button",{name:"Server management",exact:true}).click();
     const heading=popup.getByRole("heading",{name:"Server management",exact:true});
-    await expect(heading).toHaveCSS("background-color","rgb(232, 225, 237)");
+    // The view's name is the dialog title, not a second heading in the body.
+    await expect(popup).toHaveAccessibleName("Server management");await expect(heading).toHaveCount(1);
     await expect(heading.locator("svg")).toBeVisible();
     const counts=popup.getByLabel("Server counts").locator(".row");
     await expect(counts).toHaveCount(3);
-    for(const [i,color] of ["rgb(232, 225, 237)","rgb(215, 238, 224)","rgb(220, 234, 246)"].entries()) {
+    for(const [i,color] of ["rgb(248, 236, 210)","rgb(215, 238, 224)","rgb(220, 234, 246)"].entries()) {
       await expect(counts.nth(i)).toHaveCSS("background-color",color);
       await expect(counts.nth(i)).toHaveCSS("text-align","center");
       await expect(counts.nth(i).locator("dd")).toHaveCSS("text-align","center");
@@ -131,7 +132,7 @@ test("failed server management: Hint visits its card, queues free restoration, t
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(false);
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app"&&a.targetId===id)).toBe(true);
-  await expect(page.getByRole("dialog",{name:"App Servers",exact:true})).toHaveCount(0);
+  await expect(page.locator(".component-inspection-app")).toHaveCount(0);
   await page.getByRole("button",{name:"Hint",exact:true}).click();await page.getByRole("dialog",{name:"Hint",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Run");
 });

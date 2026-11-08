@@ -5,7 +5,6 @@ import { inspectEquipment, closeInspection, infrastructureAction, openGatewayMan
 import { newGame } from "../src/sim";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "../src/sim/__tests__/combinedFixture";
 
 /** As in the existing walk journeys, wait for the original camera damping/framing to finish. */
 async function settledCamera(page:Page) {
@@ -20,6 +19,9 @@ async function settledCamera(page:Page) {
 }
 
 test("inspection camera: pan and rotate survive live rerenders",async({page,installClock})=>{
+  // Advancing every WebGL frame costs more than wall time on software-rendered CI: this journey's recorded
+  // duration is 55 s, so the default 60 s left it timing out on a slow runner.
+  test.setTimeout(120_000);
   await installClock();await page.route("**/api/**",route=>route.abort());
   await seedSave(page,newGame(1,"inspection-camera"));await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
@@ -88,18 +90,18 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   await expect(page.getByRole("dialog",{name:"Database", exact: true})).toBeVisible();
 });
 
-for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps live component diagnostics and actions without legacy lessons`,async({page})=>{
-  const game=chapter===4?spikeCompany(false):chapter===5?reliabilityCompany():combinedCompany();
+for(const chapter of [4,5]) test(`inspection content: Chapter ${chapter} keeps live component diagnostics and actions without legacy lessons`,async({page})=>{
+  const game=chapter===4?spikeCompany(false):reliabilityCompany();
   await page.route("**/api/**",route=>route.abort());await seedSave(page,game);await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
-  const cue=page.getByRole("dialog",{name:/^Chapter [46]:/});
+  const cue=page.getByRole("dialog",{name:/^Chapter 4:/});
   if(await cue.isVisible())await cue.getByRole("button",{name:"Got it",exact:true}).click();
   const network=await inspectEquipment(page,"gateway");
   await expect(network).not.toContainText(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
   await expect(network.getByRole("button",{name:/Limit to|Remove traffic limit/})).toBeEnabled();
   await openGatewayManagement(page,network);await expect(network.locator(".route-check").first()).toBeVisible();
   await inspectEquipment(page,"gateway",true);await expect(network.getByRole("region",{name:"Network readings"})).toContainText("Admitted");
-  if(chapter>=5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
+  if(chapter===5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
   const cache=await inspectEquipment(page,"cache",true);
   await expect(cache).not.toContainText(/Growth due|Waiting for workload growth/);
   await expect(cache.getByRole("region",{name:"Data strategy"})).toContainText("Workload:");
@@ -114,7 +116,7 @@ for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps
   await expect(monitoring).not.toContainText("Opening campaign");
   await expect(monitoring.locator(".component-inspection-metric")).toContainText(`${game.campaign!.snapshot.latencyMs.toFixed(0)} ms`);
   await closeInspection(page);
-  if(chapter>=5)await expect(page.locator('.campaign-panel').getByRole("region",{name:"Chapter Progress",exact:true})).toContainText(chapter===5?"Stay Online":"Grow the Company");
+  if(chapter===5)await expect(page.locator('.campaign-panel').getByRole("region",{name:"Guided Mode requirements",exact:true})).toContainText("Stay Online");
 });
 
 test.describe("touch inspection camera",()=>{

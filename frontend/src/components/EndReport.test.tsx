@@ -5,7 +5,7 @@ import { newLegacyGame } from "@/sim";
 import { readAnalytics } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { sendFeedback } from "@/lib/feedback";
-import { EndReport } from "./Modals";
+import { EndReport, HowToPlay } from "./Modals";
 
 vi.mock("@/lib/feedback", () => ({ sendFeedback: vi.fn() }));
 beforeEach(() => {
@@ -20,6 +20,11 @@ const pick = (n: number) => fireEvent.click(screen.getByRole("radio", { name: `$
 const reply = () => screen.getByRole("status").textContent;
 const feedback = () => screen.queryByRole("textbox", { name: "Your feedback" });
 const ratings = () => readAnalytics().filter((e) => e.name === "rating_submitted").map((e) => e.data?.rating);
+
+it("opens on Play again, not on a rating, and offers no Keep playing to a bankrupt run", () => {
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.queryByRole("button", { name: "Keep playing" })).toBeNull();
+});
 
 describe("the end-of-run rating", () => {
   it("replies to the chosen rating and updates when the choice changes", () => {
@@ -54,4 +59,29 @@ describe("the end-of-run rating", () => {
     expect((feedback() as HTMLTextAreaElement).value).toBe("The incidents felt random");
     expect(sendFeedback).not.toHaveBeenCalled();
   });
+});
+
+it("rounds cash in the millions so a long-running company's tile is never cut short", () => {
+  cleanup();
+  useGame.setState({ game: { ...newLegacyGame("rating"), cash: -1_768_920, outcome: "bankrupt", phase: "ended", seriesAWeek: 20 } });
+  render(<StrictMode><EndReport /></StrictMode>);
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("-$1.77M");
+});
+
+it("keeps cash under a million exact", () => {
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toMatch(/^\$\d{1,3}(,\d{3})*$/);
+});
+
+it("opens How to play on Got it, not on its Close button", () => {
+  cleanup();
+  render(<StrictMode><HowToPlay /></StrictMode>);
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Got it" }));
+});
+
+it("rounds users from ten million so a company that grew past every milestone still fits its tile", () => {
+  cleanup();
+  useGame.setState({ game: { ...newLegacyGame("rating"), users: 123_456_789, cash: 82_177_907_364, outcome: "bankrupt", phase: "ended", seriesAWeek: 20 } });
+  render(<StrictMode><EndReport /></StrictMode>);
+  expect(screen.getByText("Users", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("123M");
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("$82.18B");
 });

@@ -56,6 +56,9 @@ export interface TechDef {
 
 export type PromoId = "social" | "launch" | "targeted";
 
+/** What kind of app a Challenge Mode company builds (see appProfiles.ts). */
+export type AppProfileId = "general" | "social" | "gaming" | "ecommerce" | "streaming";
+
 export interface PromoDef {
   id: PromoId;
   name: string;
@@ -386,6 +389,16 @@ export interface GameState {
   turn: number;
   phase: Phase;
   outcome: Outcome | null;
+  /**
+   * Challenge Mode: the week the Series A was secured, once the player chose to keep playing. The run then has no
+   * deadline or win, and only bankruptcy ends it. Missing in runs that have not continued past the Series A.
+   */
+  seriesAWeek?: number;
+  /**
+   * The app this Challenge Mode company builds. Null until a new company picks one in its first week; missing in
+   * runs saved before profiles existed, which play the original balance.
+   */
+  appProfile?: AppProfileId | null;
 
   cash: number;
   users: number;
@@ -429,12 +442,8 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
-  | { type:"enter_combined"; finalUserTarget?:number; sequence?:import("./scenarios/combinedCampaign").CombinedScenario[] }
-  | { type:"start_growth_wave" }
-  | { type:"acknowledge_growth" }
   | { type:"complete_campaign" }
   | { type:"accept_scaling_risk" }
-  | { type:"run_promotion" }
   | { type: "begin_introduction" }
   | { type: "acknowledge_introduction"; equipment: EquipmentId }
   | { type: "complete_introduction"; handoff?: "opening" }
@@ -450,7 +459,9 @@ export type Action =
   | { type: "restore_app"; appId: string }
   | { type: "arm_reliability" }
   | { type: "acknowledge_reliability" }
-  | { type: "enter_spikes" }
+  /** `version: 2` enters the graded chapter; recorded inputs without it replay the original rules. */
+  | { type: "enter_spikes"; version?: 2 }
+  | { type: "acknowledge_spike_attempt" }
   | { type: "unlock_autoscaling" }
   | { type: "deploy_autoscaler" }
   | { type: "set_autoscaling"; enabled: boolean }
@@ -465,6 +476,7 @@ export type Action =
   | { type: "set_routing"; mode: "single" | "balanced"; targets: string[] }
   | { type: "set_traffic_limit"; enabled: boolean }
   | { type: "launch_promotion"; promo: PromoId }
+  | { type: "choose_app_profile"; profile: AppProfileId }
   | { type: "add_server" }
   | { type: "remove_server" }
   | { type: "replace_host"; hostId: string }
@@ -480,6 +492,7 @@ export type Action =
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
+  | { type: "keep_playing" }
   | { type: "acknowledge_milestone"; enterScaling?: boolean }
   | { type: "acknowledge_prevention_review" };
 

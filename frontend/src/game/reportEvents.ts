@@ -1,9 +1,9 @@
 import type { CampaignPostmortem, Intervention, TraceEvent } from "@/sim/campaignTypes";
-import { serverName } from "@/sim";
+import { serverName, type EventKind } from "@/sim";
 const REPORT_LEAD_SECONDS = 3;
 export const ACTION_NAMES: Record<Intervention, string> = {
   "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
-  "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application", promotion: "Promotion",
+  "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application",
 };
 
 
@@ -12,6 +12,17 @@ const dollars = (cents: unknown) => new Intl.NumberFormat("en-US", { style: "cur
 const app = (id: unknown) => typeof id === "string" ? serverName(id) : "Unknown server";
 const component = (id: unknown) => id === "db" ? "Database" : id === "app" ? "Application" : app(id);
 const actionName = (type: unknown) => ACTION_NAMES[type as Intervention] ?? (typeof type === "string" ? type.replaceAll("-", " ") : "Infrastructure change");
+/** Chapter entries by the button the player pressed; Grow the Company's survives as a refused attempt in old saves. */
+const DECISION_NAMES: Record<string, string> = {
+  enter_scaling: "Continue to Scaling & Routing", enter_data: "Continue to Data Strategy", enter_spikes: "Continue to Traffic Spikes",
+  enter_reliability: "Continue to Stay Online", enter_combined: "Continue to Grow the Company",
+};
+/** A player decision, recorded by its action type such as `set_traffic_limit`, in words. */
+const decisionName = (type: unknown) => {
+  if (typeof type !== "string") return "Decision";
+  const text = DECISION_NAMES[type] ?? type.replaceAll(/[-_]/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
 /** One glanceable label for each reason the controller pauses; an empty reason means it resumed observing. */
 const BLOCKED_LABELS: Record<string, string> = {
   "Reliability test in progress": "reliability test",
@@ -48,18 +59,32 @@ function change(label: string, before: unknown, after: unknown, unit = "") {
   return `${label} ${num(before)} to ${num(after)}${unit}`;
 }
 
-export interface ReportEvent { id: number; step: number; title: string; detail: string | null }
+export interface ReportEvent { id: number; step: number; title: string; detail: string | null; kind: EventKind }
+
+/** How History's feed and a report's timeline mark an event. */
+export function eventKind(e: TraceEvent): EventKind {
+  const type = e.type;
+  if (type === "autoscaler-blocked") return e.data.reason ? "warning" : "success";
+  if (type.startsWith("autoscale-")) return type.includes("cancelled") ? "warning" : "decision";
+  return type === "settlement" ? "finance"
+  : /incident-opened|failure-started|bankruptcy/.test(type) ? "incident"
+  : /rejected|blocked|cancelled|superseded/.test(type) ? "warning"
+  : /recovered|restored|qualified|completed/.test(type) ? "success"
+  : /milestone|awarded|stage-entered|unlocked/.test(type) ? "milestone"
+  : /action-|acknowledged|enabled|reserved|decided/.test(type) ? "decision"
+  : "info";
+}
 
 /**
  * One readable line per recorded event, never raw engine fields. Per-second metrics are dropped because the
- * evidence table already shows them.
+ * report's timeline already plots them.
  */
 export function describeEvents(events: TraceEvent[], context: TraceEvent[] = events): ReportEvent[] {
   const requested = new Map(context.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
   return events.flatMap(e => {
     const d = e.data;
     const automatic = d.source === "autoscaler" ? "Autoscaler: " : "";
-    const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null }];
+    const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null, kind: eventKind(e) }];
     switch (e.type) {
       case "metrics": return [];
       case "action-requested": return line(`${automatic}${actionName(d.type)} requested`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
@@ -68,7 +93,7 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
         change("Admitted traffic", d.admittedBefore, d.admittedAfter, " req/s"), change("Routed capacity", d.effectiveBefore, d.effectiveAfter, " req/s"),
         d.routingAfter && routing(d.routingAfter) !== routing(d.routingBefore) ? `Route now ${routing(d.routingAfter)}` : null,
         typeof d.cacheTarget === "number" ? `Cache target ${Number(d.cacheTarget) / 100}%` : null);
-      case "action-rejected": return line(`${actionName(d.action)} rejected`, d.reason ? String(d.reason) : null);
+      case "action-rejected": return line(`${decisionName(d.action)} rejected`, d.reason ? String(d.reason) : null);
       case "incident-opened": return line("Incident opened", d.component ? `Bottleneck: ${component(d.component)}` : null);
       case "incident-recovered": return line("Incident recovered");
       case "recovery-streak": return line("Recovery progress", `Stable seconds ${num(d.from)} to ${num(d.to)}`);
@@ -83,6 +108,9 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "traffic-scheduled": return line("More traffic scheduled", `Arrives at game second ${d.dueStep}`);
       case "traffic-spike-started": return line("Traffic spike started", `Incoming ${num(d.to)} req/s`);
       case "traffic-spike-ended": return line("Traffic spike ended", `Incoming ${num(d.to)} req/s`);
+      case "traffic-spike-graded": return line(d.result === "practice" ? `Practice spike ${d.pulse} ended` : `Spike ${d.pulse} test ${d.result}`, `${Math.floor(Number(d.servedBasisPoints) / 100)}% of requests served`);
+      case "traffic-spike-scheduled": return line(`Spike ${d.pulse} scheduled`, `Starts at game second ${d.startStep}`, `${num(d.peak)} req/s`);
+      case "spike-attempt-acknowledged": return line(`Spike ${d.pulse} result reviewed`);
       case "workload-changed": return line("Workload changed", d.profile ? `${String(d.profile).replaceAll("-", " ")} workload` : null, typeof d.to === "number" && `${num(d.to)} req/s`);
       case "autoscale-scale-out-decided": return line(`Autoscaler: +${app(d.targetId)}`);
       case "autoscale-scale-up-decided": return line(`Autoscaler: ↑${app(d.targetId)}`);
@@ -90,8 +118,6 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "autoscale-instance-retired": return line(`Autoscaler: -${app(d.targetId)}`, "retired");
       case "autoscale-retirement-cancelled": return line(`Autoscaler: kept ${app(d.targetId)}`, d.reason ? String(d.reason) : null);
       case "autoscaler-blocked": return d.reason ? line("Autoscaler: paused", blockedLabel(d.reason)) : line("Autoscaler: observing");
-      case "scenario-started": return line(`Growth wave ${Number(d.index) + 1} started`, d.template ? `${String(d.template).replaceAll("-", " ")}` : null, `Peak ${num(d.peak)} req/s`);
-      case "scenario-pressure-ended": return line("Growth wave eased", `Back to ${num(d.baseline)} req/s`);
       case "promotion-started": return line("Promotion started", d.increment ? `+${num(d.increment)} req/s` : null, `Until game second ${d.endStep}`);
       case "promotion-ended": return line("Promotion ended", `Back to ${num(d.baseline)} req/s`);
       default: { const text = e.type.replaceAll("-", " "); return line(text.charAt(0).toUpperCase() + text.slice(1)); }

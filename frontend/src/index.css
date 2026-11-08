@@ -47,6 +47,9 @@
   --warn-ink: #a65400;
   --critical: #ff4d5e;
   --critical-ink: #c41d33;
+  /* Destructive buttons: white text keeps at least 4.5:1 at rest, hovered and pressed. */
+  --danger-hover: #d02a40;
+  --danger-active: #a3172a;
   /* Critical text on the caption's dark band. */
   --critical-caption: #ffb4bb;
 
@@ -125,8 +128,44 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The game reads as an app rather than a page: clicking, dragging and long-pressing through panels, dialogues and
+   the room never highlight their text. What a player types, and a seed, run, session or build ID they may want to
+   copy (always in code), stay selectable. */
 body {
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]),
+code {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* An ID is copied whole: one click, double-click or long press on its chip selects exactly the chip's value, never
+   one hyphen-separated part of it or the chip beside it. */
+code {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+/* A copyable identifier reads as a small chip on paper; the night menu card gives its own a night fill. The chip
+   moves to the next line whole rather than splitting an ID, and breaks only an ID wider than the line. Its line
+   height keeps a line holding a chip as tall as the lines around it. */
+code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  padding: 1px 6px;
+  font-weight: 600;
+  background: var(--control-inset);
+  border-radius: 3px;
 }
 
 h1,
@@ -332,7 +371,8 @@ button:disabled {
 .app.is-title .eq-labels,
 .app.is-title .camera-buttons,
 .app.is-title .floor-menu,
-.app.is-title .side {
+.app.is-title .side,
+.app.is-title .equipment-shell {
   display: none;
 }
 
@@ -637,7 +677,8 @@ button:disabled {
   left: var(--tip-arrow, 50%);
   width: 10px;
   height: 10px;
-  margin-left: -5px;
+  /* Half its width plus the tooltip's border: `left` counts from inside that border. */
+  margin-left: -7px;
   background: var(--night);
   border: 2px solid var(--night-line);
   transform: rotate(45deg);
@@ -1227,12 +1268,14 @@ button:disabled {
   z-index: 5;
 }
 
-/* Positioned every frame by the scene, which projects each anchor to the screen. */
+/* Positioned every frame by the scene, which projects each anchor to the screen. A label scaled down for zoom or
+   distance shrinks towards its marker's foot, so it still stands on its machine. */
 .eq-labels > * {
   position: absolute;
   left: 0;
   top: 0;
   visibility: hidden;
+  transform-origin: 50% 100%;
   will-change: transform;
   animation: label-arrive 0.3s ease-out both;
 }
@@ -1438,6 +1481,7 @@ button:disabled {
   padding: 3px 8px;
   font-size: var(--text-sm);
   color: var(--on-night);
+  font-variant-numeric: tabular-nums;
 }
 .gate-tag b {
   font-weight: 700;
@@ -1456,6 +1500,22 @@ button:disabled {
 .gate-in.is-rejecting { border-color: var(--warn); }
 .gate-in.is-rejecting b { color: var(--warn); }
 .gate-in.is-rejecting .gate-note { color: var(--warn); font-weight: 700; animation: blink 1.2s steps(2, jump-none) infinite; }
+/* The Opening's first Run: the In gate announces the coming growth in its own gold until the jump has been seen. */
+.gate-in.is-cued { box-shadow: 0 0 0 2px var(--go), 0 0 18px var(--go); animation: gate-cue 1.6s ease-in-out infinite; }
+.gate-cue {
+  max-width: 22ch;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--go);
+  white-space: normal;
+}
+@keyframes gate-cue {
+  50% { box-shadow: 0 0 0 2px var(--go), 0 0 4px var(--go); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-in.is-cued { animation: none; }
+}
 
 @keyframes blink {
   50% {
@@ -1717,12 +1777,12 @@ button:disabled {
 }
 
 .btn-danger {
-  background: var(--critical);
+  background: var(--critical-ink);
   color: #fff;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #ff6b79;
+  background: var(--danger-hover);
 }
 
 .btn-quiet {
@@ -2145,9 +2205,15 @@ button:disabled {
     transition: height 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out, content-visibility 0.24s allow-discrete;
   }
 
+  /*
+   * Opening shows the contents at once and tweens only the height and fade. A discrete content-visibility transition
+   * would keep them hidden (out of the accessibility tree and find-in-page) until the browser draws the slide's first
+   * frame, which a busy page can delay for seconds. Closing still keeps them until the slide has folded.
+   */
   .more[open]::details-content {
     height: auto;
     opacity: 1;
+    transition-property: height, opacity;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3694,14 +3760,58 @@ button:disabled {
   margin: 0;
 }
 
+/* On a phone the end report's three or four actions would wrap raggedly, so they form an even grid instead: two
+   equal columns with the primary action last on the right, one column on the narrowest screens. A lone primary
+   (Play again after a loss) takes the whole row. */
+@media (max-width: 640px) {
+  .report-foot {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+  }
+
+  .report-foot .btn-row {
+    display: contents;
+  }
+
+  .report-foot .btn-row > .btn:last-child:nth-child(2) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Stay and Continue sit together on the right; an extra action such as Copy result keeps the left. When a narrow
    dialog wraps them, each wrapped line stays right-aligned under the one before. */
 .chapter-end-foot {
   justify-content: flex-end;
 }
 
+/* A dialog that ends a chapter is wide enough for Stay and Continue to sit side by side; phones still wrap them. */
+.modal:has(.chapter-end-foot) {
+  width: min(560px, 100%);
+}
+
 .chapter-end-extra {
   margin-right: auto;
+}
+
+/* The finished campaign's two ways to look back share a row, and Continue to Challenge Mode takes the full row under
+   them; where they cannot share one (a phone), every action takes its own full row. */
+.modal:has(.campaign-complete-foot) {
+  width: min(560px, 100%);
+}
+
+.campaign-complete-foot > .btn {
+  flex: 1 1 auto;
+}
+
+.campaign-complete-foot > :is(.btn-primary, .btn-danger) {
+  flex-basis: 100%;
+}
+
+/* The unsaved warning keeps its own room between the scrolling report and the actions. */
+.campaign-recovery-report .modal-body > .callout {
+  flex: none;
+  margin-top: 12px;
 }
 
 .modal-body h4 {
@@ -3926,12 +4036,8 @@ button:disabled {
 
 .menu-seed code {
   margin: 0 4px;
-  padding: 1px 6px;
-  font-family: var(--font-num);
-  font-weight: 600;
   color: var(--on-night);
   background: var(--night-3);
-  border-radius: 3px;
 }
 
 .menu-resume {
@@ -4827,6 +4933,20 @@ button:disabled {
   gap: 6px;
 }
 
+/* On a phone the five ratings share the row evenly, so the narrowest screens never push 5 past the card's edge. */
+@media (max-width: 640px) {
+  .rating-buttons {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .rating .rating-buttons button {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+}
+
 .rating-buttons button {
   width: 38px;
   height: 36px;
@@ -5012,6 +5132,25 @@ button:disabled {
 
 .toast .callout {
   box-shadow: var(--lift);
+}
+
+/* A dialog that reaches down to the toast takes it as its last row, so it covers none of the dialog's actions. */
+.modal > .toast-inline {
+  position: static;
+  flex: none;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding: 8px 18px 14px;
+}
+
+.modal > .toast-inline .callout {
+  box-shadow: none;
+}
+
+/* The control kept in view above it keeps the body's own margin. */
+.modal:has(> .toast-inline) :focus {
+  scroll-margin-block: 18px;
 }
 
 /* ---------------------------------------------------------------- */
@@ -5317,10 +5456,16 @@ button:disabled {
 .incident .campaign-guidance { margin-top: 10px; }
 /* Tighter rhythm than the shared defaults so the whole overview fits a laptop-height panel. */
 .campaign-panel .panel-head { margin-bottom: 10px; }
-/* The banner (plus the recovery countdown once it starts) pins inside the panel's own scroll box;
-   top cancels the head's -14px bleed margin so it still sticks flush to the panel's top edge. */
-.campaign-panel .panel-head { position: sticky; top: -14px; z-index: 5; flex-wrap: wrap; }
-.campaign-panel .incident-pin-clock { flex: 1 1 100%; margin-top: 8px; }
+/* The banner (plus the recovery bar once it starts) pins inside the panel's own scroll box. Its bleed margin already
+   puts it flush with the panel's top edge, so it sticks from the first pixel of scroll and never slides. */
+.campaign-panel .panel-head { position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+/* A short phone's bottom sheet is barely taller than the banner: pinned there, it would hide everything under it. */
+@media (max-width: 900px) and (max-height: 740px) {
+  .campaign-panel .panel-head { position: relative; }
+}
+/* The pinned recovery bar spans the banner under its title, on a paper track that reads against the stripes. */
+.campaign-panel .panel-head > .incident-pin-clock { display: block; flex: 1 1 100%; margin-top: 2px; }
+.campaign-panel .incident-pin-clock .meter { height: 12px; background: var(--paper); border-color: var(--paper); border-radius: 4px; }
 .campaign-panel .incident-symptoms { margin-top: 10px; }
 .campaign-panel .impact { margin: 8px 0; }
 .campaign-panel .step-head { margin-bottom: 6px; }
@@ -5344,6 +5489,8 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+/* The tab bar sits clearly apart from the charts, events or incidents under it. */
+.history-tabset > .tab-panel { padding-top: 16px; }
 
 @media (max-width: 480px) {
   .history-tabset .segment { padding-inline: 4px; }
@@ -5445,9 +5592,11 @@ button:disabled {
 }
 /* The shell that grows from the pressed button onto the card while it opens (InspectionReveal.tsx). */
 .inspection-morph { position: fixed; box-sizing: border-box; margin: 0; border: 1px solid var(--control-edge); box-shadow: var(--lift); pointer-events: none; }
+/* The details fade in without moving: a transform would make them the containing block of a purchase preview opened
+   from their actions (Monitoring's Deploy Health Checks), pinning the preview to the details instead of the screen. */
 .inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes inspection-details-open {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; }
 }
 /* Without motion the disc swaps faces in place instead of turning over. */
 @media (prefers-reduced-motion: reduce) {

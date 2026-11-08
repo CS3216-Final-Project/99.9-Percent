@@ -1,5 +1,6 @@
 import type { GameState } from "@/sim";
 import { replayCampaign } from "@/sim";
+import { canCompleteCampaign } from "@/sim/campaignCompletion";
 import type { CampaignInput } from "@/sim/campaignTypes";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
@@ -37,10 +38,28 @@ export type Validation = {
     status: "ok";
     envelope: SaveEnvelope;
     game: GameState;
+    /** The save recorded play in the removed Grow the Company chapter, which loading discarded. */
+    retiredChapter: boolean;
 } | {
     status: "corrupt" | "unsupported";
 };
 const integer = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
+type Replay = (inputs: readonly CampaignInput[], step: number) => GameState;
+/**
+ * Grow the Company, the former Chapter 6, was removed. A company that entered it had completed Stay Online, so it
+ * loads completed there: its inputs up to the entry, then Complete campaign at that step. Nothing it did in the
+ * chapter is kept. The entry is the first attempt the chapter's gates accepted, which are Complete campaign's
+ * gates; a refused attempt stays in the history like any other rejection, and so does the play after it.
+ */
+function retiredChapterCompletion(inputs: readonly CampaignInput[], replay: Replay) {
+    for (const [i, { step, action }] of inputs.entries()) {
+        if ((action.type as string) !== "enter_combined") continue;
+        const kept = inputs.slice(0, i), before = replay(kept, step);
+        if (canCompleteCampaign(before))
+            return { inputs: [...kept, { step, action: { type: "complete_campaign" as const } }], step };
+    }
+    return null;
+}
 const isInput = (i: CampaignInput) => !!i && typeof i === "object" && integer(i.step) &&
     !!i.action && typeof i.action === "object" && typeof i.action.type === "string";
 export function validateEnvelope(value: unknown): Validation {
@@ -66,7 +85,7 @@ export function validateEnvelope(value: unknown): Validation {
     const dataActions = ["enter_data", "contrast_workload", "deploy_cache", "tune_cache"];
     if ((legacy || phase2 || phase3) && e.inputs.some(i => dataActions.includes(i.action.type)))
         return {status:"corrupt"};
-    const spikeActions = ["enter_spikes", "unlock_autoscaling", "deploy_autoscaler", "set_autoscaling", "acknowledge_spikes"];
+    const spikeActions = ["enter_spikes", "acknowledge_spike_attempt", "unlock_autoscaling", "deploy_autoscaler", "set_autoscaling", "acknowledge_spikes"];
     if ((legacy || phase2 || phase3 || phase4) && e.inputs.some(i => spikeActions.includes(i.action.type))) return {status:"corrupt"};
     const reliabilityActions = ["acknowledge_prevention_review", "enter_reliability", "unlock_reliability", "deploy_health_checks", "install_spare", "reserve_spare",
         "release_spare", "deploy_failover", "set_failover", "restore_app", "arm_reliability", "acknowledge_reliability"];
@@ -99,14 +118,23 @@ export function validateEnvelope(value: unknown): Validation {
         if(foundation && (!integer(foundation.step) || foundation.step>e.step || !integer(foundation.inputs) || foundation.inputs>inputs.length ||
             inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions,...combinedActions].includes(input.action.type) ||
                 (input.action.type==="acknowledge_milestone" && input.action.enterScaling!==false)))) return {status:"corrupt"};
-        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && !phase7 && !phase8 && !phase9 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs, serviceStart, e.scenarioVersion, legacyIncidentStep, legacyScalingStep);
+        // Boundaries recorded after the end of a shortened replay are clamped to it.
+        const replay: Replay = (inputs, step) => replayCampaign(e.seed, e.runId, inputs, step, legacy, foundation,
+            !phase6 && !phase7 && !phase8 && !phase9 && e.schemaVersion !== SCHEMA_VERSION, Math.min(legacyPreventionInputs, inputs.length),
+            {...serviceStart, fromStep:Math.min(serviceStart.fromStep, step + 1)}, e.scenarioVersion, Math.min(legacyIncidentStep, step), Math.min(legacyScalingStep, step));
+        const completion = retiredChapterCompletion(inputs, replay);
+        const game = completion ? replay(completion.inputs, completion.step) : replay(inputs, e.step);
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;
+        const trace = game.campaign!.trace.length;
+        // Playtest records of the discarded chapter stay as recorded. The completion that replaced it is not recorded,
+        // so none of its events takes a trace identity the discarded chapter already used.
         const measurement: Measurement = legacy
-            ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}
+            ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:trace}
+            : completion ? {...e.runtime.measurement, cursor:trace}
             : e.runtime.measurement;
-        if(!measurementValid(measurement) || measurement.cursor > game.campaign!.trace.length ||
+        if(!measurementValid(measurement) || measurement.cursor > trace ||
             measurement.pending.some(event => event.runId !== e.runId)) return {status:"corrupt"};
-        return { status: "ok", envelope: makeEnvelope(game, e.runtime.remainderMs, e.savedAt, measurement), game };
+        return { status: "ok", envelope: makeEnvelope(game, e.runtime.remainderMs, e.savedAt, measurement), game, retiredChapter: !!completion };
     }
     catch {
         return { status: "corrupt" };
@@ -126,8 +154,4 @@ export function decodeSave(raw: string): Validation {
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
     const c = game.campaign!;
     return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.replayScenarioVersion??c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, serviceMeasurementStart: {fromStep:c.serviceMeasurement?.fromStep??c.step+1,scope:c.serviceMeasurement?.scope==="full-run"?"full-run":"since-upgrade"}, ...(c.foundation?{foundation:c.foundation}:{}), ...(c.legacyPreventionInputs?{legacyPreventionInputs:c.legacyPreventionInputs}:{}), ...(c.legacyIncidentStep?{legacyIncidentStep:c.legacyIncidentStep}:{}), ...(c.legacyScalingStep?{legacyScalingStep:c.legacyScalingStep}:{}), runtime: { remainderMs, measurement }, savedAt };
-}
-/** Never replace an existing save unless its payload can actually be replayed. */
-export function replaceable(raw: string | null): boolean {
-    return raw === null || decodeSave(raw).status === "ok";
 }

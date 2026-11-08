@@ -10,10 +10,10 @@ The home screen offers two modes, each with its own save.
 
 | Mode | Internal name | Clock | Goal |
 | --- | --- | --- | --- |
-| Guided Mode | `campaign` | Continuous game seconds, settled every 60 seconds as an operating week | Learn infrastructure concepts through a walkthrough and six chapters |
-| Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt |
+| Guided Mode | `campaign` | Continuous game seconds, settled every 60 seconds as an operating week | Learn infrastructure concepts through a walkthrough and five chapters |
+| Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt, then optionally keep playing with no deadline |
 
-Challenge Mode is locked until the first five Guided Mode chapters (Opening to Stay Online) are complete.
+Challenge Mode is locked until all five Guided Mode chapters (Opening to Stay Online) are complete.
 Once unlocked, a player can switch between modes without losing either save.
 
 ## Guided Mode
@@ -29,7 +29,6 @@ Starting a new company is a separate, confirmed reset.
 | 3 | Data Strategy | `data-strategy` | How does workload change the value of a cache? |
 | 4 | Traffic Spikes & Autoscaling | `traffic-spikes` | Can delayed automation handle changing demand at an acceptable cost? |
 | 5 | Stay Online | `application-reliability` | Does failure detection leave enough surviving capacity? |
-| 6 | Grow the Company | `combined-campaign` | Can the company handle combined growth and stay solvent? |
 
 Chapter status is derived from engine state in `frontend/src/game/campaignChapters.ts`.
 Every chapter transition is an explicit player action; reports, milestones and recognitions are acknowledged by the player, never automatically.
@@ -42,7 +41,7 @@ The +1s and +5s buttons (and `N`) advance exactly that many seconds and stop ear
 Speed changes real-time pacing, not the work modelled per step.
 
 The first incident pauses automatically.
-Pending recovery reviews, milestones, spike recognition and bankruptcy stop advancement.
+Pending recovery reviews, milestones, spike recognition, failed spike test debriefs and bankruptcy stop advancement.
 Opening the menu or hiding the browser tab pauses play; there is no offline catch-up.
 
 ### Chapter 0: Guided infrastructure introduction
@@ -51,9 +50,9 @@ New companies start Launch Week with four sequential inspections: Network, App S
 
 Simulation time is frozen throughout the introduction: no incidents, settlement, research purchases, capacity upgrades or financial targets are required. Inspecting is free. The normal component popups supply live readings, and Hint repeats the current explanation. The compact side panel shows X/4 components explored and the exact next action.
 
-Introduction inputs are part of the deterministic save log, including inspection acknowledgements. A reload resumes the same step. Complete Introduction records an explicit Opening handoff and reuses the existing Opening initializer: $20,000, one 1,000 requests/s application, a 600 ops/s database and the original 300 requests/s starting workload. The $15,000/400 ops/s tutorial profile is an isolated demonstration, not Chapter 1's business state. The run identity, input history and tutorial completion are retained; time remains zero. No Opening milestone, research reward or Scaling entry is granted by the tutorial. Opening still requires its existing proactive prevention or reactive incident-recovery pathway and explicit recognition before Chapter 2 Scaling & Routing. Chapters 3-6 retain their existing rules. Practice restores the parked original company on completion or Exit.
+Introduction inputs are part of the deterministic save log, including inspection acknowledgements. A reload resumes the same step. Complete Introduction records an explicit Opening handoff and reuses the existing Opening initializer: $20,000, one 1,000 requests/s application, a 600 ops/s database and the original 300 requests/s starting workload. The $15,000/400 ops/s tutorial profile is an isolated demonstration, not Chapter 1's business state. The run identity, input history and tutorial completion are retained; time remains zero. No Opening milestone, research reward or Scaling entry is granted by the tutorial. Opening still requires its existing proactive prevention or reactive incident-recovery pathway and explicit recognition before Chapter 2 Scaling & Routing. Chapters 3-5 retain their existing rules. Practice restores the parked original company on completion or Exit.
 
-Saves retain their original replay scenario and input prefix. New completion inputs identify the Opening destination, and subsequent saves replay the original tutorial before entering the existing Opening profile. Historical completion inputs without that destination retain their recorded direct-to-Scaling result; existing companies are not silently rewound or rebalanced. An unfinished older introduction can use the corrected completion button. Existing scripted Launch Week saves retain their original incident and score-card behavior. The chapter list always reserves 1 for Opening, 2 for Scaling & Routing and 3-6 for the remaining chapters, including historical saves. Classic Mode and save schema 8 are unchanged.
+Saves retain their original replay scenario and input prefix. New completion inputs identify the Opening destination, and subsequent saves replay the original tutorial before entering the existing Opening profile. Historical completion inputs without that destination retain their recorded direct-to-Scaling result; existing companies are not silently rewound or rebalanced. An unfinished older introduction can use the corrected completion button. Existing scripted Launch Week saves retain their original incident and score-card behavior. The chapter list always reserves 1 for Opening, 2 for Scaling & Routing and 3-5 for the remaining chapters, including historical saves. Classic Mode and save schema 8 are unchanged.
 
 
 ### Chapter 1: Opening
@@ -75,8 +74,10 @@ There are two ways to complete the Opening; both award the same `opening-stabili
   A failing step resets the streak; pausing, reading and reloading add no observations.
   The player reviews the prevention outcome and presses Continue company.
 
-The panel lists three chapter requirements for the whole Opening: growth, a verified prevention outcome or recovered incident, and the milestone.
-While prevention is still possible, its own checks are listed under Opening prevention progress rather than as extra chapter requirements.
+The panel lists three chapter requirements for the whole Opening: growth, the first growth handled and reviewed, and the milestone.
+Prevention is not explained or tracked in the panel.
+It only becomes possible after the growth, seconds before the incident is due, when its checks can rarely still be met, so listing them read as noise.
+A player who does prevent the incident still gets the prevention review and the same milestone.
 
 The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
@@ -108,8 +109,24 @@ Observe contrasting workload optionally switches the profile once after growth.
 ### Chapter 4: Traffic Spikes & Autoscaling
 
 Entry requires consumed data growth, positive cash, stable management, empty queues and acknowledged reports, and grants one research point for the autoscaling technology.
-For entry at step `n`, demand is 4,000 req/s during `[n+8, n+28)` and `[n+48, n+68)` and 2,400 req/s otherwise.
+For entry at step `n`, demand rises to the spike peak during `[n+8, n+28)` and `[n+48, n+68)` and is 2,400 req/s otherwise.
 These are saved deadlines; pausing and reloading do not move them.
+
+The chapter is a graded test.
+The spike peak is 4,000 req/s for a read-heavy company and 3,400 req/s for a write-heavy one, the most the 3,000 ops/s database can serve with a warm cache.
+The first spike is practice and is not graded.
+The second spike, and every retry, passes when at least 95% of its incoming requests succeed.
+Rejected requests count as unserved, so a traffic limit cannot pass the test.
+When a test fails, the clock stops on a debrief showing the served share, the main cause (traffic limit, database, autoscaling delay, a small server in an evenly split pool, or too little server capacity) and what to change.
+The database is named whenever it overloaded in at least as many spike seconds as the servers, because more servers only send it more work; its advice lists only the cache, cache tuning or database upgrade the company can still buy.
+Server capacity that joined part-way through a spike is reported with the second it arrived.
+Another spike of the same size starts 20 game seconds after the failed one ended, and retries continue until one passes.
+A company that goes bankrupt on the second a spike ends is not graded or given another spike; the bankruptcy ends the run.
+Incidents opened before the chapter completes close after five stable seconds without a recorded response, because the spike tests judge the response instead.
+After completion, incidents need a recorded response again.
+
+Companies that entered Traffic Spikes before the graded test keep the original rules: two spikes of 4,000 req/s, completion after both, and incidents that need a recorded response.
+The difference is recorded in the entry input, so their saves replay unchanged.
 
 The optional controller needs the unlock, deployed load balancing, balanced routing to at least two apps, a free slot and cash.
 It watches routed processed work divided by routed capacity:
@@ -118,9 +135,12 @@ It watches routed processed work divided by routed capacity:
 - Below 60% for six safe observations, it retires an eligible controller-created app, never leaving fewer than two.
 - At most four apps are installed, with a four-step cooldown after each join, upgrade or retirement.
 - New apps take the lowest free number, so a retirement never leaves a numbering gap; the controller's decisions, pending actions and completions are announced in the event log and as notifications.
+- For four game seconds after each decision, install, routing join, upgrade or retirement, a beam lights the affected server in the room and a note beside its label explains the move; the note never pauses the game and can be dismissed.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
-After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.
+After a passed test, five stable baseline steps complete the chapter, which the player then acknowledges.
+The completion dialog scores the passed spike's served share, the number of graded spikes taken, setup spending, the share of routed capacity idle outside the spikes from entry to completion, and the changes made by the player and by autoscaling.
+The score never affects completion.
 
 ### Chapter 5: Stay Online
 
@@ -129,42 +149,53 @@ The target app fails eight steps later and restores itself after twenty failed s
 Health Checks detect the failure on a later step, and a reserved spare is promoted after a delay; failover reroutes traffic but adds no capacity.
 Actual reports and five stable observations after restoration precede the explicit reliability acknowledgement.
 
-### Chapter 6: Grow the Company
+### Completing the campaign
 
-Entry requires acknowledged reliability, stable full-demand management at 2,400 req/s, empty queues, healthy apps, positive cash and finished actions and reports.
-Registered users grow from 2,000 to 20,000, 35,000 and 50,000 across three announced waves.
-Baseline demand is `2400 + floor((users - 2000) * 600 / (target - 2000))`, so 2,400, 2,625, 2,812 and 3,000 req/s for the default target.
-
-The seeded pool holds one read-heavy pulse (3,800/4,000 req/s), one write-heavy pressure (3,000 req/s) and one failure under load (3,400/3,600 req/s with one temporary app fault).
-Five stable full-demand observations make Start next growth wave available, and each wave is announced eight steps ahead.
-After each wave, queues must drain, apps must be healthy, reports must be acknowledged and five stable full-demand observations must follow before the player reviews the growth outcome.
-After all three reviews, five more full-demand steps qualify the final review, and Complete campaign ends the run, freezes the clock and keeps the company inspectable.
-Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line built from the recorded scorecard, and the last line shows users, uptime (when known) and incidents.
+Stay Online is the last chapter.
+Its outcome ends on the completion menu with Stay in this chapter or Complete campaign.
+Complete campaign needs the acknowledged reliability outcome, normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues, finished queued changes, every server up and healthy requests.
+It ends the run as won, records the final scorecard, freezes the clock and keeps the company inspectable.
+A company that stays keeps operating, and Next in the chapter bar offers Complete campaign, disabled with its unmet requirements, until the company is ready.
+Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line.
+Taylor's line counts the recorded incidents, and the last line shows uptime (when known) and incidents from the recorded scorecard.
 Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
+The scorecard ends on Inspect final company, Export or start a new company, and Continue to Challenge Mode, which saves the finished company and switches to Challenge Mode, now unlocked.
+When the company cannot be saved, Continue to Challenge Mode turns into “Switch and lose this company” with a warning that switching loses it, and switches only when pressed again.
+View run scorecard, in the final company's panel or the Menu, reopens the scorecard with the same three actions.
 
-An optional promotion costs $500, activates next step, adds 400 req/s for twelve steps and has a thirty-step cooldown.
-
-The final scorecard separates settled and pending revenue, setup and operating costs, salaries and promotion spending.
+The final scorecard separates settled and pending revenue, setup and operating costs, and salaries.
 It reports rejected demand separately from service errors, plus architecture, technologies, incident count, service-health uptime and the longest degraded span.
 Confirmed replay archives the old company and scorecard and starts a new run ID and seed.
+
+Grow the Company, a former sixth chapter of growth waves and promotions, was removed.
+A company saved after entering it had already completed Stay Online, so it loads with the campaign completed at the step it entered that chapter.
+Everything it did in that chapter is discarded without notice, however that chapter went, including bankruptcy.
+The entry is the first attempt that chapter accepted; a refused attempt, and the Stay Online play after it, are kept.
+When the completed company is first saved, the browser keeps the original save as a backup if storage has room; a full storage never stops the save.
 
 ### Guidance
 
 Guidance never changes the rules; it reads the same state the engine uses.
 
 - The chapter bar shows the chapter, one state-derived goal and Next when a transition is available.
-- Every chapter followed by another one (Launch Week or the Opening, Scaling & Routing, Data Strategy, Traffic Spikes, Stay Online) ends on one completion menu, with the clock paused: Stay in this chapter, or Continue into the next chapter.
+- Every chapter (Launch Week or the Opening, Scaling & Routing, Data Strategy, Traffic Spikes, Stay Online) ends on one completion menu, with the clock paused: Stay in this chapter, or Continue into the next chapter, which after Stay Online is Complete campaign.
   For Launch Week, the Opening, Traffic Spikes and Stay Online the menu is the chapter's own recognition, which either choice acknowledges; Scaling & Routing and Data Strategy announce it once per company.
 - Continue is disabled while the next chapter's entry gate is unmet, and the menu names every unmet requirement; Next in the chapter bar then offers the chapter, disabled with the same reasons, until the company is ready.
-  Stay Online needs normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues and healthy requests; Grow the Company also needs finished queued changes and every server up.
+  Stay Online needs normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues and healthy requests; Complete campaign also needs finished queued changes and every server up.
 - The menu asks to open with Continue focused when it is possible, and with Stay focused otherwise.
 - Escape, Close and a click outside the menu all mean Stay in this chapter: the recognition is acknowledged and the menu does not return for that company.
 - A company that stays after Launch Week or the Opening remains in that finished chapter: none of Scaling & Routing's controls or requirements appear until Next enters it.
 - An Opening the player stays in is remembered for that company in the browser's profile, so the next Play does not move it into Scaling & Routing; a company loaded without that record, such as an older save, an import or a cloud restore, still continues into Scaling & Routing on Play.
-- Chapter requirements list each gate as met or unmet, without revealing future deadlines.
+- Chapter requirements list each gate the player acts on as met or unmet, without revealing future deadlines.
+  Gates every chapter implies stay in the engine but are not listed: no active incident, postmortems and reports read, the previous chapter finished, and positive cash, which a running company always has because zero cash ends it.
+  Rows another row already covers are not listed either: Traffic Spikes' stable baseline only counts at baseline traffic, and Stay Online's restored server implies its failure was observed.
+  Scaling & Routing lists database headroom, growth and empty queues; Data Strategy lists growth, empty queues and healthy requests; Traffic Spikes lists its test (or pulses), empty queues, healthy requests, stable baseline and the acknowledged response; Stay Online lists finished pending actions, empty queues, healthy requests, the started test, the restored server, stable service and the acknowledged outcome.
 - Each chapter keeps the same requirement rows for its whole length, so its count never changes mid-chapter; a row that stops applying, such as Scaling's database headroom after its growth wave, stays listed as met.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
-- Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
+- The Opening's first Run (its first game second) moves the view to the server floor's In gate, where requests enter.
+  The gate glows and says requests are about to climb until the growth arrives, then that they climbed, and the callout ends four seconds after the growth.
+  Only companies that came through the introduction get it; it is presentation only and never part of the save.
+- Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, then Taylor) stating its mission.
   A new company's introduction opens with Maya's welcome first, asking the player to check out the machines; Opening's message then skips her greeting.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
@@ -172,7 +203,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
   A hidden tab, blurred window or pointer lock only suspends the scene in place - it is not dismissed, and the stage cue queued behind it still follows in order.
 - A new diagnostic incident that keeps running shows one Pause invitation.
 - A decision that pauses a company the player can still run shows one Run invitation, which lasts until the clock restarts or another prompt owns attention.
-- Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
+- Every report (incident postmortem, prevention review, chapter outcome, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.
 
 ## Simulation rules
@@ -245,6 +276,35 @@ Challenge Mode is the migrated prototype ([prototype-migration.md](prototype-mig
 - The workload assumes 60% of database demand is cache-eligible, and writes are never cached.
 - Promotions need no research: Social push from the start, Launch campaign at 5,000 users and Targeted campaign at 10,000 users.
 - Legacy definitions from the 17-node prototype tree remain only so old saves resume; removed research cannot be started again, and progress counts only the nine nodes.
+- Reaching 50,000 users secures the Series A and ends the run on its report, which offers Keep playing.
+  Choosing it carries the same company on with no deadline and no second win: growth, incidents, surges and costs continue, and only bankruptcy ends it.
+  The save records the week the Series A was secured, and the final report keeps the credit for it, so a later bankruptcy is not scored as a run that never won.
+  A won run that has not chosen yet reopens on its report from the home screen.
+  Playing on, the Users goal climbs through milestones of 100,000, 1,000,000, 10,000,000 and 100,000,000 users, after which there is no goal.
+  The goal is the first milestone above the company's peak users, so a milestone once reached stays reached when users dip.
+  The milestones are presentation only: they change no rule or score and are not saved.
+
+### App profiles
+
+A new Challenge Mode company says what it builds: Social media, Online game, Online store or Music streaming (`frontend/src/sim/appProfiles.ts`).
+The cards appear right after the first-week tutorial, at the start of week 2, or in week 1 for a player who has done or skipped the tutorial.
+Weeks do not advance while the choice is waiting, and the engine accepts it only once and only up to week 2.
+Until then, and in runs saved before profiles existed, the company plays the original balance as a General app.
+
+Each profile scales the same equipment's workload and market against that original balance:
+
+| Profile | Traffic per user | Database work per request | Cacheable reads | Revenue per user | Users notice lag from | Promotions |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| General | 1.0x | 1.0x | 60% | 1.0x | 70% load | As listed |
+| Social media | 1.0x | 1.15x | 70% | 0.9x | 70% load | Social push 1.6x users and 1.2x spike, Launch 1.2x users, Targeted 0.8x users |
+| Online game | 1.25x | 0.7x | 70% | 1.05x | 50% load | Launch 1.4x users and 1.3x spike, Targeted 0.9x users |
+| Online store | 0.85x | 1.35x | 35% | 1.25x | 70% load | Targeted 1.5x users and 1.3x spike, Launch 1.1x users and 1.4x spike, Social push 0.7x users |
+| Music streaming | 1.15x | 1.0x | 85% | 1.0x | 80% load | Social push 1.25x users |
+
+The read cache still removes at most 36% of database work (50% tuned), so a profile's cacheable share only matters below that.
+The lag column is the peak load at which the weekly satisfaction penalty starts; it reaches its maximum at full load as before.
+Promotion prices are unchanged, so a profile's favourite promotion buys more users per dollar.
+The top bar keeps the choice in the place Guided Mode keeps Hint (on phones, among the numbers behind Users and revenue), and its card lists what the profile changes.
 
 ## Saves
 

@@ -32,11 +32,13 @@ test("introduction hands off to one Opening Run spotlight, then Hint-flow upgrad
   expect(opening.completedIntroduction?.completed).toBe(true);
   expect(opening.step).toBe(0);
   expect(opening.runId).toBe(game.campaign!.runId);
-  // The chapter opens with a one-card tip pointing at the Hint button; dismiss it to reach the guided step.
-  await page.getByRole("dialog",{name:"Tip, step 1 of 1",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
+  // No tip stands between the introduction and the first Run: Hint explains itself when it first has advice.
+  await expect(page.getByRole("dialog",{name:"Tip, step 1 of 1",exact:true})).toHaveCount(0);
   const coach=page.getByRole("region",{name:"Chapter 1 guide",exact:true});
   const spotlight=page.locator('[data-spotlight="true"]');
   await expect(coach.getByRole("heading",{name:"Run, then observe",exact:true})).toBeVisible();
+  // The card explains Run in the player's terms; the engine's internal schedule note stays out of it.
+  await expect(coach).not.toContainText("scheduled growth");
   await expect(spotlight).toHaveCount(1);
   await expect(spotlight).toHaveAccessibleName("Run");
   await advanceCampaignStep(page,{seconds:1,resumeClock:false});

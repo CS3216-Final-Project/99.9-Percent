@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { BALANCE, metrics } from "@/sim";
+import { metrics, userGoal } from "@/sim";
 import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { compact, money, num, signedMoney, uptimePct } from "@/game/format";
@@ -7,8 +7,10 @@ import { useGame } from "@/game/store";
 import { AppHealthEntry } from "@/components/CampaignAppHealth";
 import { FinanceEntry } from "@/components/CampaignFinance";
 import { healthOf } from "@/components/health";
+import { usersGoalTip } from "@/components/presentation";
 import { Icon } from "@/components/icons";
 import { SoundButton } from "@/components/SoundButton";
+import { AppProfileSection } from "@/components/AppProfile";
 import { tipProps } from "@/components/tips";
 import { Meter, Stat } from "@/components/ui";
 import { PhoneChapterRow } from "../layout/PhoneChapterRow";
@@ -16,7 +18,7 @@ import "../layout/phone-layout.css";
 
 /**
  * Region: top strip. One row the room never loses: the logo, Cash, the health or incident status, the company's
- * other numbers behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
+ * other numbers (and, in Challenge Mode, what the company builds) behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
  * During an incident the whole strip takes the red striped treatment.
  */
 export function PhoneTopStrip() {
@@ -106,13 +108,14 @@ function ClassicHeadline() {
 function ClassicNumbers() {
   const game = useGame((s) => s.game);
   const m = metrics(game);
+  const goal = userGoal(game);
   return <>
-    <Stat icon="users" kind="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
+    <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
       <strong>{num(game.users)}</strong>
-      <span className="stat-goal">
-        <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
-        <span className="muted">Goal {compact(BALANCE.targetUsers)}</span>
-      </span>
+      {goal !== null && <span className="stat-goal">
+        <Meter value={game.users / goal} label={`Progress to ${num(goal)} users`} />
+        <span className="muted">Goal {compact(goal)}</span>
+      </span>}
     </Stat>
     <Stat icon="revenue" kind="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
       <strong>{money(m.revenue)}/wk</strong>
@@ -121,5 +124,6 @@ function ClassicNumbers() {
     <Stat icon="health" kind="health" label="Uptime" tip="The share of requests served across the whole run.">
       <strong>{uptimePct(m.uptime)}</strong>
     </Stat>
+    <AppProfileSection />
   </>;
 }

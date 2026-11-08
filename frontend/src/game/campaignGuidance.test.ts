@@ -2,15 +2,16 @@
 import {campaignGuidance,campaignObjective} from "./campaignGuidance";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
+import {preventionRequirements} from "../sim/openingPrevention";
 import {canEnterSpikes} from "../sim/autoscaling";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
-import {combinedCompany,finishRound} from "../sim/__tests__/combinedFixture";
+import {completedReliability} from "../sim/__tests__/completionFixture";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;}
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
 function prevented(){return advanceSteps(decision(decision(newGame(),{type:"set_traffic_limit",enabled:true}),{type:"start_db_upgrade"}),4).state;}
-function row(g:GameState,id:string){const m=campaignGuidance(g);return [...m.requirements,...m.preventionChecks].find(r=>r.id===id)!;}
+function row(g:GameState,id:string){return campaignGuidance(g).requirements.find(r=>r.id===id)!;}
 it("objectives follow actual phase before chapter without replacing required actions",()=>{
  const g=scaling();
  expect(campaignObjective(g)).toBe("Prepare the system for the next growth wave.");
@@ -47,35 +48,36 @@ function counts(g:GameState,steps:number,play:(g:GameState,i:number)=>GameState=
  return [...seen];
 }
 it("keeps Scaling's headroom row, met, once its growth has arrived",()=>{
- expect(counts(scaling(),40,(g,i)=>i===2?decision(g,{type:"start_db_upgrade"}):g)).toEqual([8]);
+ expect(counts(scaling(),40,(g,i)=>i===2?decision(g,{type:"start_db_upgrade"}):g)).toEqual([3]);
  const grown=advanceSteps(decision(scaling(),{type:"start_db_upgrade"}),20).state;
  expect(grown.campaign!.scaling!.consumed).toBe(true);expect(row(grown,"headroom").met).toBe(true);
 });
 it("keeps Stay Online's arming row, met, once the test has started",()=>{
- expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([12]);
+ expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([7]);
  expect(row(decision(reliabilityCompany(),{type:"arm_reliability"}),"pending").met).toBe(true);
 });
-it("keeps Grow the Company's restoration row whether or not a wave has failed a server",{timeout:30_000},()=>{
- let g=combinedCompany();const calm=campaignGuidance(g).requirements.length;expect(row(g,"restored").met).toBe(true);
- for(let i=0;i<2;i++){g=tick(g,5);g=decision(g,{type:"start_growth_wave"});g=finishRound(g);g=decision(g,{type:"acknowledge_growth"});}
- // The third wave fails a server under load.
- g=decision(tick(g,5),{type:"start_growth_wave"});
- expect(g.campaign!.combinedStage!.currentRound!.fault!.restoredStep).toBeNull();
- expect(campaignGuidance(g).requirements).toHaveLength(calm);expect(row(g,"restored").met).toBe(false);
+it("offers Complete campaign after Stay Online, and names what a busy company still waits for",{timeout:30_000},()=>{
+ const g=completedReliability(),m=campaignGuidance(g);
+ expect(m.pendingAction).toEqual({label:"Complete campaign",action:{type:"complete_campaign"}});
+ expect(campaignObjective(g)).toBe("Stay Online is complete. Complete the campaign with Next when you are ready.");
+ const busy=campaignGuidance(decision(g,{type:"add_server"}));
+ expect(busy.pendingAction).toBeNull();
+ expect(busy.notice).toBe("The campaign can be completed once queued changes have finished.");
 });
-it("nests the prevention path's checks under its single chapter requirement",()=>{
+it("keeps the Opening to its three requirements while prevention is possible, with no prevention text",()=>{
  const m=campaignGuidance(prevented());
+ expect(m.prevention).toBe(true);
  expect(m.requirements.map(r=>r.id)).toEqual(["growth","outcome","milestone"]);
- expect(m.preventionChecks.map(r=>r.id)).toEqual(["incident","cash","admission","queues","healthy","app-inspection","db-inspection","observations","review"]);
- expect(campaignGuidance(newGame()).preventionChecks).toEqual([]);
+ expect(row(prevented(),"outcome").label).toBe("First growth handled and reviewed");
+ expect(m.optional).toBeNull();expect(m.notice).toBeNull();expect(m.waiting).toBeNull();
 });
-it("preventive limit explains full-demand qualification and leaves removal actionable",()=>{
- const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBe("Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
+it("a preventive limit blocks full-demand prevention and leaves removal actionable",()=>{
+ const g=prevented(),r=preventionRequirements(g.campaign!);expect(r.fullDemand).toBe(false);expect(r.applicationInspected).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
 });
 it("new inspections and observations update prevention without auto-completing it",()=>{
  let g=prevented();g=decision(g,{type:"incident_inspect",equipment:"app"});g=decision(g,{type:"incident_inspect",equipment:"db"});g=decision(g,{type:"set_traffic_limit",enabled:false});
- g=advanceSteps(g,2).state;expect(row(g,"observations").label).toBe("Stable observations: 2 / 5");expect(row(g,"db-inspection").met).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
- expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toContain("both valid paths");
+ g=advanceSteps(g,2).state;expect(g.campaign!.openingPrevention!.stableSteps).toBe(2);expect(preventionRequirements(g.campaign!).databaseInspected).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
+ expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toBeNull();
  g=advanceSteps(g,3).state;expect(campaignGuidance(g).pendingAction?.label).toBe("Review outcome");expect(g.campaign!.openingMilestone).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
  g=decision(g,{type:"acknowledge_prevention_review"});expect(campaignGuidance(g).pendingAction?.label).toBe("Complete Opening");expect(campaignGuidance(g).stage).toBe("Opening");expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);expect(row(g,"milestone").met).toBe(false);
 });
@@ -84,29 +86,47 @@ it("Scaling exposes purchased headroom readiness separately from consumed growth
  const ready=advanceSteps(decision(g,{type:"start_db_upgrade"}),3).state;expect(row(ready,"headroom").met).toBe(true);expect(campaignGuidance(ready).waiting).toBeNull();
  const copy=structuredClone(ready);copy.campaign!.scaling!.dueStep=999999;expect(campaignGuidance(copy)).toEqual(campaignGuidance(ready));
 });
-it.each(["management","incident","queues","reports"])("Scaling explains missing %s readiness/continuation",id=>{
- const g=scaling();g.campaign!.scaling!.consumed=true;
+function breakImplied(g:GameState,id:string){
  if(id==="management")g.phase="review";
  if(id==="incident")g.campaign!.incident=advanceSteps(newGame(),6).state.campaign!.incident;
- if(id==="queues")g.campaign!.apps[0].backlog=1;
  if(id==="reports")g.campaign!.trace=g.campaign!.trace.filter(t=>t.type!=="review-acknowledged");
- expect(row(g,id).met).toBe(false);expect(campaignGuidance(g).dataAvailable).toBe(canEnterData(g));expect(campaignGuidance(g).pendingAction?.action?.type).not.toBe("enter_data");
+ if(id==="milestone")g.campaign!.openingMilestone!.acknowledged=false;
+ if(id==="cash")g.campaign!.cashCents=0;
+ return g;
+}
+it("lists only what each chapter's player can act on, not the gates every chapter implies",()=>{
+ const ids=(g:GameState)=>campaignGuidance(g).requirements.map(r=>r.id);
+ const grown=scaling();grown.campaign!.scaling!.consumed=true;
+ expect(ids(grown)).toEqual(["headroom","growth","queues"]);
+ expect(ids(dataCompany())).toEqual(["growth","queues","healthy"]);
+ expect(ids(spikeCompany(false))).toEqual(["pulses","queues","healthy","observations","recognition"]);
+ expect(ids(reliabilityCompany())).toEqual(["pending","queues","healthy","armed","restored","observations","recognition"]);
+ expect(ids(advanceSteps(newGame(1,"launch-list",2),6).state)).toEqual(["research","launch","milestone"]);
 });
-it.each(["growth","cash","milestone","management","incident","queues","reports","healthy"])("Data exposes its real missing %s gate",id=>{
+it("Scaling explains missing queues readiness/continuation",()=>{
+ const g=scaling();g.campaign!.scaling!.consumed=true;g.campaign!.apps[0].backlog=1;
+ expect(row(g,"queues").met).toBe(false);expect(campaignGuidance(g).dataAvailable).toBe(canEnterData(g));expect(campaignGuidance(g).pendingAction?.action?.type).not.toBe("enter_data");
+});
+it.each(["management","incident","reports"])("Scaling still waits on the implied %s gate without listing it",id=>{
+ const g=scaling();g.campaign!.scaling!.consumed=true;breakImplied(g,id);
+ expect(campaignGuidance(g).requirements.some(r=>r.id===id)).toBe(false);
+ expect(canEnterData(g)).toBe(false);expect(campaignGuidance(g).pendingAction?.action?.type).not.toBe("enter_data");
+});
+it.each(["growth","queues","healthy"])("Data exposes its real missing %s gate",id=>{
  const g=dataCompany();
  if(id==="growth")g.campaign!.dataStage!.consumed=false;
- if(id==="cash")g.campaign!.cashCents=0;
- if(id==="milestone")g.campaign!.openingMilestone!.acknowledged=false;
- if(id==="management")g.phase="review";
- if(id==="incident")g.campaign!.incident=advanceSteps(newGame(),6).state.campaign!.incident;
  if(id==="queues")g.campaign!.dbBacklog=1;
- if(id==="reports")g.campaign!.trace=g.campaign!.trace.filter(t=>t.type!=="review-acknowledged");
  if(id==="healthy")g.campaign!.snapshot.latencyMs=500;
  expect(row(g,id).met).toBe(false);expect(campaignGuidance(g).spikesAvailable).toBe(canEnterSpikes(g));expect(campaignGuidance(g).pendingAction?.action?.type).not.toBe("enter_spikes");
 });
+it.each(["cash","milestone","management","incident","reports"])("Data still waits on the implied %s gate without listing it",id=>{
+ const g=breakImplied(dataCompany(),id);
+ expect(campaignGuidance(g).requirements.some(r=>r.id===id)).toBe(false);
+ expect(canEnterSpikes(g)).toBe(false);expect(campaignGuidance(g).pendingAction?.action?.type).not.toBe("enter_spikes");
+});
 it("Data optional investments and contrast are never mandatory",()=>{
  const g=dataCompany();g.campaign!.readCache=null;g.campaign!.dataStage!.contrastConsumed=false;
- expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toContain("optional");
+ expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toBeNull();
 });
 it("Data omits generic waiting copy but explains blocked readiness",()=>{
  const g=dataCompany();g.campaign!.dataStage!.consumed=false;g.campaign!.dataStage!.dueStep=999999;
@@ -125,6 +145,11 @@ it("Spikes future timing never enters guidance",()=>{
 it("missing inactive review is diagnosed rather than silently repaired",()=>{
  const g=recovered();g.phase="management";expect(campaignGuidance(g).notice).toContain("no review is active");expect(campaignGuidance(g).pendingAction).toBeNull();expect(g.campaign!.openingMilestone).toBeNull();
 });
+it("a completed campaign drops Stay Online's purchase advice with its other guidance",()=>{
+ expect(campaignGuidance(completedReliability()).optional).toContain("Reliability purchases are optional");
+ const m=campaignGuidance(act(completedReliability(),{type:"complete_campaign"}));
+ expect(m.optional).toBeNull();expect(m.waiting).toBeNull();expect(m.pendingAction).toBeNull();expect(m.notice).toContain("Campaign complete.");
+});
 it("ended companies offer evidence/restart guidance without continuation",()=>{
  const g=scaling();g.phase="ended";expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).notice).toContain("bankrupt");
 });
@@ -133,13 +158,9 @@ it.each([newGame(),prevented(),recovered(),scaling(),dataCompany(),spikeCompany(
  const m=campaignGuidance(g);expect(campaignGuidance(JSON.parse(before))).toEqual(m);expect(JSON.stringify(g)).toBe(before);expect(applyAction(g,{type:"set_traffic_limit",enabled:g.campaign!.limit===null}).ok).toBe(availability);
 });
 
-it.each(["management","incident","queues","reports","baseline","healthy"])("Spikes explains missing %s completion state",id=>{
+it.each(["queues","healthy"])("Spikes explains missing %s completion state",id=>{
  const g=untilOffset(act(spikeCompany(false),{type:"set_traffic_limit",enabled:true}),68);
- if(id==="management")g.phase="review";
- if(id==="incident")g.campaign!.incident=advanceSteps(newGame(),6).state.campaign!.incident;
  if(id==="queues")g.campaign!.dbBacklog=1;
- if(id==="reports")g.campaign!.trace=g.campaign!.trace.filter(t=>t.type!=="review-acknowledged");
- if(id==="baseline")g.campaign!.incomingRate=4000;
  if(id==="healthy")g.campaign!.snapshot.serviceErrorRate=0.01;
  expect(row(g,id).met).toBe(false);expect(campaignGuidance(g).pendingAction?.label).not.toBe("Review spike recognition");
 });

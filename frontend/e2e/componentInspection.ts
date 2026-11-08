@@ -3,8 +3,6 @@ import { expect, savedGame } from "./fixtures";
 import { applyAction, type GameState } from "../src/sim";
 
 export type Component = "db" | "app" | "gateway" | "cache" | "monitoring";
-const NAMES = { db: "Database", app: "App Server", gateway: "Network", cache: "Read Cache", monitoring: "Monitoring" };
-const TITLES = { ...NAMES, app: "Servers" };
 export const inspection = (page: Page) => page.locator(".component-inspection");
 export const purchasePreview = (page: Page) => page.locator(".component-purchase, .campaign-action-popover");
 
@@ -17,7 +15,8 @@ export async function closeInspection(page: Page) {
 
 /** Only public controls: works when the rack is off-screen, on another floor or the sheet is folded. */
 export async function inspectEquipment(page: Page, component: Component, details=false): Promise<Locator> {
-  const modal=page.getByRole("dialog",{name:component==="app"?"App Servers":TITLES[component],exact:true});
+  // The title follows the open view (Server 1, Server management...), so find the dialog by its equipment.
+  const modal=page.locator(`.component-inspection-${component}`);
   if (!await modal.isVisible()) {
     await closeInspection(page);
     const folded=page.locator('.panel-reopen, .phone-sheet-handle[aria-expanded="false"]');
@@ -89,10 +88,9 @@ export async function openGatewayManagement(page:Page,scope?:Locator):Promise<Lo
 }
 
 /**
- * Route every app: tick each unchecked "Send traffic to" checkbox in the gateway management view.
- * Each pick queues a routing change that activates on the next game second, so `advance` (a caller
- * that delivers one game second, e.g. `advanceCampaignStep`) runs between picks - the fieldset is
- * disabled while a routing change is pending.
+ * Route every app: tick each unchecked "Send traffic to" checkbox in the gateway management view, then close the
+ * window, which sends the picks as one routing change. `advance` (a caller that delivers one game second, e.g.
+ * `advanceCampaignStep`) then runs once so the change activates.
  */
 export async function routeAllApps(page:Page,scope?:Locator,advance?:()=>Promise<void>):Promise<Locator> {
   const panel=await openGatewayManagement(page,scope);
@@ -100,9 +98,9 @@ export async function routeAllApps(page:Page,scope?:Locator,advance?:()=>Promise
     const next=panel.locator(".route-check[aria-checked='false']").first();
     if(await next.count()===0)break;
     await next.click();
-    if(!advance)break;
-    await advance();
   }
+  await closeInspection(page);
+  if(advance)await advance();
   return panel;
 }
 

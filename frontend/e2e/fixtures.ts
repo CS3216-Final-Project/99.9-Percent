@@ -1,4 +1,4 @@
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
 import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
@@ -12,7 +12,11 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
   // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
   reviewCompanyMessage: [true, { option: true }],
   companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
-    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).click());
+    // The message opens while the room compiles its shaders in software WebGL, when drawn frames arrive seconds apart.
+    // A click first waits for the button to hold still over frames after the dialogue's entrance animation, which spent
+    // much of the budget of the check that met the message (expectRoom). Enter on the focused Dismiss button activates
+    // it as a keyboard player would, with no frames to wait for; companyMessages.ts presses it by pointer.
+    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).press('Enter'));
     await use();
   }, { auto: true }],
   // The colleagues' celebration before the final scorecard; campaignFinale.spec.ts opts out to play it.
@@ -40,8 +44,8 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
     await use();
   }, { auto: true }],
   /**
-   * A run opens in first person until the player chooses a view. Journeys play as someone who chose the overview, in
-   * both modes, unless they say otherwise with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
+   * Every run opens in the overview. Journeys play as someone who chose it, in both modes, unless they say otherwise
+   * with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
    */
   overviewChosen: [true, { option: true }],
   chosenView: [async ({ context, overviewChosen }, use) => {
@@ -99,6 +103,36 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
 });
 export { expect };
 
+/** Waits out running CSS transitions: reduced motion still runs every change as a 1 ms one, which must be over before anything is measured. */
+export async function transitionsDone(page: Page) {
+  await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished.catch(() => undefined))));
+}
+
+/** Each of `controls` is in view and can be pressed anywhere: no floating message, such as a toast, covers any part of it. */
+export async function expectUncovered(page: Page, controls: Locator) {
+  await transitionsDone(page);
+  const toasts = await page.locator('.toast').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON() as DOMRect));
+  for (const control of await controls.all()) {
+    await expect(control).toBeInViewport({ ratio: 1 });
+    const name = await control.textContent();
+    const box = await control.evaluate(el => el.getBoundingClientRect().toJSON() as DOMRect);
+    for (const toast of toasts) expect(toast.right <= box.left || toast.left >= box.right || toast.bottom <= box.top || toast.top >= box.bottom, `a toast covers "${name}"`).toBe(true);
+    expect(await control.evaluate(el => {
+      // Its centre and, clear of the rounded corners, its four edges.
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      return [[x, y], [r.left + 6, y], [r.right - 6, y], [x, r.top + 3], [x, r.bottom - 3]].every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
+    }), `"${name}" is covered`).toBe(true);
+  }
+}
+
+/** `dialog` says once, beside `controls`, that the company could not be saved, and no toast repeats it or covers them. */
+export async function expectUnsavedWarningOnce(page: Page, dialog: Locator, controls: Locator) {
+  await expect(dialog.getByRole('alert').filter({ hasText: 'could not be saved' })).toBeVisible();
+  // Counted at once: a toast leaves on its own after a few seconds.
+  expect(await page.getByRole('alert').allTextContents()).toEqual([expect.stringContaining('could not be saved')]);
+  await expectUncovered(page, controls);
+}
+
 /** The first incident's one-time card, which frames Run with the incident loop. */
 export const incidentGuide = (page: Page) => page.getByRole('region', { name: 'Incident guide' });
 
@@ -149,6 +183,35 @@ export async function savedGame(page: Page): Promise<GameState> {
   return JSON.parse(JSON.stringify(result.game)) as GameState;
 }
 
+/**
+ * Stops the page's animation clock (Chromium DevTools), so whatever the next action starts stays on its first frame
+ * however slowly the browser draws or answers; the returned function restarts the clock. Playwright's clock does not
+ * reach CSS transitions or Web Animations.
+ */
+export async function holdAnimationClock(page: Page) {
+  const devtools = await page.context().newCDPSession(page);
+  await devtools.send('Animation.enable');
+  await devtools.send('Animation.setPlaybackRate', { playbackRate: 0 });
+  return async () => {
+    await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+    await devtools.detach();
+  };
+}
+
+/**
+ * Opens a More disclosure by its summary and waits for its slide to end. Its contents are there at once, but until the
+ * slide has grown they are clipped and do not count towards the scroll height, so scrolling to them must wait. Chrome
+ * fires no transition events for `::details-content`: the slide has ended once it is opaque and holds its height.
+ */
+export async function openDisclosure(summary: Locator) {
+  await summary.click();
+  await expect.poll(() => summary.locator('..').evaluate(details => new Promise<boolean>(done => {
+    const slide = () => getComputedStyle(details, '::details-content');
+    const height = slide().height;
+    requestAnimationFrame(() => requestAnimationFrame(() => done(slide().opacity === '1' && slide().height === height)));
+  }))).toBe(true);
+}
+
 export async function expectRoom(page: Page, timeout?: number) {
   const room = page.getByRole('main');
   if (roomlessTargets.has(page) || roomlessTargets.has(page.context())) {
@@ -168,7 +231,12 @@ export async function expectRoom(page: Page, timeout?: number) {
 }
 
 /** Classic keeps the weekly state in its own save slot. */
-export async function seedClassicSave(page: Page, game: GameState) {
+/**
+ * Seed a Challenge Mode run. A company that has not yet said what it builds is seeded as a general app, the original
+ * balance, so journeys about something else are not stopped by the choice; journeys about the choice start fresh.
+ */
+export async function seedClassicSave(page: Page, seeded: GameState) {
+  const game = seeded.appProfile === null ? { ...seeded, appProfile: "general" as const } : seeded;
   await page.addInitScript(({ game, meta }) => {
     if (localStorage.getItem('nn.classic.save.v1') === null) {
       localStorage.setItem('nn.classic.save.v1', JSON.stringify({ savedAt: 1, game }));
@@ -248,10 +316,17 @@ export async function completeTutorial(page: Page, {keepChapterGuide=false}: {ke
       await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();
     }
     await complete.click();
-    const tip=page.getByRole("dialog",{name:"Tip, step 1 of 1"});
-    if(await tip.waitFor({state:"visible",timeout:2_000}).then(()=>true).catch(()=>false))await tip.getByRole("button",{name:"Got it",exact:true}).click();
     const guide=page.getByRole("dialog",{name:"Chapter guide, step 1 of 1"});
     if(!keepChapterGuide&&await guide.isVisible())await guide.getByRole("button",{name:"Got it",exact:true}).click();
   } else if(await doors.isVisible())await doors.click();
-  else await skip.click();
+  else { await skip.click(); await chooseAppProfile(page); }
+}
+
+/** Answer Challenge Mode's "What are you building?" cards, which follow its first-week tutorial or a skipped one. */
+export async function chooseAppProfile(page: Page, name = "Social media") {
+  const picker = page.getByRole("dialog", { name: "What are you building?" });
+  await expect(picker).toBeVisible();
+  await picker.getByRole("radio", { name }).check();
+  await picker.getByRole("button", { name: "Start building", exact: true }).click();
+  await expect(picker).toBeHidden();
 }

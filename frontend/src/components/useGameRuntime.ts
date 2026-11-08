@@ -6,7 +6,7 @@ import type { AudioSettings } from "@/game/persist";
 import type { PlayScope } from "@/game/scope";
 import { createSfx } from "@/game/sfx";
 import { createSpeech } from "@/game/speech";
-import { useGame } from "@/game/store";
+import { choosingAppProfile, useGame } from "@/game/store";
 import { fromAvatar } from "@/game/viewpoints";
 import { incidentActive } from "@/sim/step";
 import { daylightNow } from "./scene/dayClock";
@@ -187,6 +187,7 @@ export function useGameRuntime(scope?: PlayScope): void {
   const speed = useGame((s) => s.speed);
   const view = useGame((s) => s.view);
   const onboarding = useGame((s) => s.onboarding);
+  const choosing = useGame(choosingAppProfile);
   const touring = useGame((s) => s.tour?.track ?? null);
   useMusic();
   useSoundEffects();
@@ -207,10 +208,10 @@ export function useGameRuntime(scope?: PlayScope): void {
 
   // Auto-advance during management.
   useEffect(() => {
-    if (campaign || phase !== "management" || !running || onboarding || view || touring || !started) return;
+    if (campaign || phase !== "management" || !running || onboarding || view || touring || !started || choosing) return;
     const id = window.setTimeout(() => useGame.getState().advance(), (AUTO_SECONDS * 1000) / speed);
     return () => window.clearTimeout(id);
-  }, [campaign, phase, running, speed, turn, onboarding, view, touring, started]);
+  }, [campaign, phase, running, speed, turn, onboarding, view, touring, started, choosing]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

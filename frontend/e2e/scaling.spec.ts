@@ -74,7 +74,7 @@ for (const path of ["vertical", "horizontal"] as const) {
       // Paint the installed rack with the physical game still paused.
       await page.clock.runFor(200);
       await page.getByRole("main").getByRole("button", { name: "Server 2", exact: true }).click();
-      const reveal = page.getByRole("dialog", { name: "App Servers" });
+      const reveal = page.locator(".component-inspection-app");
       await expect(reveal).toContainText("Server 2");
       await reveal.getByRole("button",{name:"Back to Server management",exact:true}).click();await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /Server 2:/ })).toHaveAttribute("aria-pressed", "true");
       await reveal.getByRole("button", { name: "Close",exact:true }).click();

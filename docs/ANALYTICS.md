@@ -52,7 +52,7 @@ Every event carries:
 | --- | --- |
 | `event_version` | `1` |
 | `build_id` | `VITE_BUILD_ID`, else the commit SHA, else `unrecorded` |
-| `content_version` | `launch-week-v1` for Guided Mode, `classic-v1` for Challenge Mode |
+| `content_version` | `five-chapters-v1` for Guided Mode, `classic-v1` for Challenge Mode |
 | `mode` | `campaign` or `classic` |
 | `run_id` | The Guided Mode run ID, or a random UUID for a Challenge Mode run |
 | `gameplay_session_id` | Random UUID per play session |
@@ -67,7 +67,8 @@ Active time counts only while the tab is visible and within two minutes of point
 Visible planning, onboarding, incident and review time counts even while the game is paused.
 These are engagement estimates, not proof of attention.
 
-`content_version` `launch-week-v1` marks the playable Launch Week that replaced the Chapter 0 walkthrough; under `chapters-v2` and `chapters-v1`, `tutorial_step` counted different lesson lists.
+`content_version` `five-chapters-v1` marks Guided Mode ending at Stay Online, after Grow the Company was removed.
+`launch-week-v1` marked the playable Launch Week that replaced the Chapter 0 walkthrough, whose companies could still enter Grow the Company; under `chapters-v2` and `chapters-v1`, `tutorial_step` counted different lesson lists.
 Increment it in `productAnalytics.ts` when the set or meaning of chapters or walkthrough steps changes; build IDs distinguish releases within a content version.
 
 ### Events
@@ -91,7 +92,7 @@ Increment it in `productAnalytics.ts` when the set or meaning of chapters or wal
 | `gameplay_launch_score` | Launch Week finishes | `nines`, `uptime` |
 
 Guided Mode completion means chapters 1 to 5, the same set that unlocks Challenge Mode.
-Chapter 0 and chapter 6, Grow the Company, are not reported as chapters, and once a run is complete the observer stops measuring it, so chapter 6 play produces no session or duration events.
+Chapter 0 is not reported as a chapter, and once a run is complete the observer stops measuring it, so play after Stay Online, and Challenge Mode play after Keep playing past the Series A, produce no session or duration events.
 Reopening or importing a completed save baselines its milestones and emits no retrospective completion.
 
 Tutorial events cover Challenge Mode's first-week tutorial only (`tutorial_track` `basics`); Guided Mode's Launch Week reports `gameplay_launch_beat`, `gameplay_launch_pick` (the research choice) and `gameplay_launch_score` (the final uptime nines) instead.
@@ -154,7 +155,9 @@ A live project, its settings and dashboard are not established by these tests.
 Both modes append events to `nn.campaign.analytics.v1` for facilitated playtests; nothing is sent anywhere and records are never truncated.
 Menu > Playtest exports them as JSON, together with observer notes and the participant source.
 
-- Guided Mode records come from the engine trace (`projectEvents` in `telemetry.ts`): run and session starts, inspections, every player and autoscaler action requested and activated, traffic changes, incidents opened and recovered, chapter entries and completions, prevention progress, reliability and growth-wave events, the final scorecard and bankruptcy.
+- Guided Mode records come from the engine trace (`projectEvents` in `telemetry.ts`): run and session starts, inspections, every player and autoscaler action requested and activated, traffic changes, incidents opened and recovered, chapter entries and completions, prevention progress, reliability events, campaign completion with its final scorecard, and bankruptcy.
   Each record has an event ID, run, session, build, scenario and physical step.
+  A company saved in the removed Grow the Company chapter keeps its recorded events, and loading it completed at Stay Online records nothing for that completion.
 - Both modes also record floor switches, walk mode, view changes, map use and avatar changes; Challenge Mode also records its walkthrough starts, completions and skips.
 - Challenge Mode records runs started and finished, incidents started and completed, hints, ratings, voluntary replays, resumes, imports and mode switches.
+  A run finishes once, at its outcome; choosing Keep playing after the Series A records `endless_started`, and the later bankruptcy records `endless_finished` instead of a second `run_finished`.

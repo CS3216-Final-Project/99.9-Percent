@@ -1,10 +1,11 @@
-import { currentFault } from "./combinedCampaign";
 import type { Action, ActionResult, GameState } from "./types";
 import type { Campaign, AppInstance, ScheduledAction } from "./campaignTypes";
 import { APPLICATION_RELIABILITY as R } from "./scenarios/applicationReliability";
 import { clone } from "./state";
 import { trace } from "./trace";
 import { allocateAppId, qualifiesForRecovery } from "./step";
+/** Stay Online's temporary application failure, once the player has started the test. */
+export function currentFault(c:Campaign) {return c.reliabilityStage?.fault??null;}
 export const reportsAcknowledged=(c:Campaign)=>c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
 export const healthy=(a:AppInstance)=>a.health!=="failed";
 export const serving=(a:AppInstance)=>a.role!=="spare";
@@ -80,7 +81,7 @@ export function observeReliability(s:GameState):void {
   const spare=c.apps.find(a=>a.id===d.spareId);
   if(spare&&healthy(spare)&&!spare.backlog)schedule(c,"promote-spare",1,0,{source:"failover",targetId:spare.id,expectedRouting:JSON.stringify(c.routing),failureId:f.id});
  }
- if(!c.combinedStage&&f?.restoredStep!==null&&f&&d.completedStep===null){
+ if(f?.restoredStep!==null&&f&&d.completedStep===null){
   const ready=s.phase==="management"&&c.cashCents>0&&!c.incident&&!c.dbBacklog&&c.apps.every(a=>!a.backlog)&&reportsAcknowledged(c)&&qualifiesForRecovery(c.snapshot);
   d.stableSteps=ready?d.stableSteps+1:0;
   if(d.stableSteps===5){d.completedStep=c.step;trace(c,"reliability-stage-completed",{eventId:f.id,restoredStep:f.restoredStep!,limited:c.limit!==null,rejected:c.cumulative.rejected,setupCents:c.investedCents,incidentOccurred:c.trace.some(t=>t.type==="incident-opened"&&t.step>=f.startStep)});}

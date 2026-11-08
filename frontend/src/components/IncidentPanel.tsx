@@ -1,7 +1,7 @@
 "use client";
 
 import { equipmentInfo, inspectable, inspectSeconds, recoveryOptions, symptomaticEquipment } from "@/sim";
-import { clock, moneyFull, num, pct } from "@/game/format";
+import { clock, compact, moneyFull, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { EQUIPMENT_ICON } from "./presentation";
@@ -89,7 +89,8 @@ export default function IncidentPanel() {
           <div>
             <Concept kind="users" icon="users" />
             <dt>Users lost</dt>
-            <dd>{num(inc.damage.usersLost)}</dd>
+            {/* Compact from 10,000 so a large company's losses fit the narrow side-panel tile. */}
+            <dd>{compact(inc.damage.usersLost)}</dd>
           </div>
           <div>
             <Concept kind="cash" icon="cash" />

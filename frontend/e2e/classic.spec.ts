@@ -1,6 +1,7 @@
 import { setGameSpeed, openRoomControls } from "./fixtures";
-import { test, expect, expectRoom, savedClassicGame as savedGame, seedClassicSave as seedSave, unlockChallenge } from './fixtures';
-import { advanceTurn, newLegacyGame as newGame } from '../src/sim';
+import { test, expect, expectRoom, chooseAppProfile, savedClassicGame as savedGame, seedClassicSave as seedSave, unlockChallenge } from './fixtures';
+import { advanceTurn, BALANCE, newLegacyGame as newGame } from '../src/sim';
+import { balanced, runBot } from '../src/sim/__tests__/bots';
 
 test.beforeEach(async ({ page }) => {
   await unlockChallenge(page);
@@ -56,10 +57,35 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await page.getByRole('button', { name: /^Launch/ }).first().click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible();
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  // Playing the week is the last step: the guide closes by itself.
+  // Playing the week is the last step: the guide closes by itself, and the company says what it builds.
   await expect(page.getByRole('dialog', { name: /Tutorial, step/ })).toBeHidden();
+  const picker = page.getByRole('dialog', { name: 'What are you building?' });
+  await expect(picker.getByRole('radio')).toHaveCount(4);
+  await expect(picker.getByRole('button', { name: 'Start building', exact: true })).toBeDisabled();
+  await page.screenshot({ path: test.info().outputPath('app-profile-picker.png') });
+  // Weeks wait for the choice.
+  await page.keyboard.press('n');
+  expect((await savedGame(page)).turn).toBe(2);
+  // Tab keeps to the cards, the way a modal should, and reaches Start building once one is chosen.
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('radio', { name: 'Social media' })).toBeFocused();
+  await picker.getByRole('radio', { name: 'Online game' }).check();
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('button', { name: 'Start building', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('radio', { name: 'Online game' })).toBeFocused();
+  await page.screenshot({ path: test.info().outputPath('app-profile-picked.png') });
+  await picker.getByRole('button', { name: 'Start building', exact: true }).click();
+  await expect(picker).toBeHidden();
+  // The choice stays in the top bar, where Guided Mode keeps Hint.
+  const yourApp = page.locator('.topbar').getByRole('button', { name: 'Your app: Online game' });
+  await yourApp.click();
+  await expect(page.getByRole('dialog', { name: 'Your app' })).toContainText('Players leave the moment it lags');
+  await page.screenshot({ path: test.info().outputPath('app-profile-card.png') });
+  await page.keyboard.press('Escape');
   const before = await savedGame(page);
   expect(before.turn).toBe(2);
+  expect(before.appProfile).toBe('gaming');
   expect(before.infra.appHosts).toHaveLength(2);
   expect(before.totals.promosRun).toBe(1);
   expect(before.tasks.some(task => task.techId === 'larger_servers') || before.releases.some(release => release.techId === 'larger_servers') || before.techDone.includes('larger_servers')).toBe(true);
@@ -71,6 +97,8 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'What are you building?' })).toHaveCount(0);
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Your app: Online game' })).toBeVisible();
   await page.waitForLoadState('networkidle');
   expect(hd).toEqual([]);
 });
@@ -82,6 +110,7 @@ test('keeps the game playable when the furniture and creature models cannot be d
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await chooseAppProfile(page);
   await skipped;
   await crew;
   await expectRoom(page);
@@ -109,6 +138,7 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await chooseAppProfile(page);
   // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
   await expectRoom(page, 30_000);
   // Five surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
@@ -129,6 +159,7 @@ test('keeps the game playable when the HD textures and furniture cannot be downl
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await chooseAppProfile(page);
   await surfaces;
   await furniture;
   await expectRoom(page, 30_000);
@@ -144,6 +175,7 @@ test('recovers from a corrupt save through the playable first-run flow', async (
   await expect(page.getByRole('alert')).toHaveText('Saved Challenge Mode run was unreadable. Started a new one.');
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await chooseAppProfile(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
 });
@@ -212,6 +244,7 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await chooseAppProfile(page);
   const mute = page.getByRole('button', { name: 'Mute sound' });
   await expect(mute).toHaveAttribute('aria-pressed', 'false');
   // Give the loops time to be synthesised; a failure would be reported on the console.
@@ -235,4 +268,44 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('nn.audio.v1')!))).toEqual({ music: 80, effects: 45, muted: true, captions: true });
+});
+
+test('keeps a company going past its Series A with no deadline, and resumes it after a reload', async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const won = runBot(BALANCE.introSeed, balanced, 'expert').state;
+  expect(won).toMatchObject({ phase: 'ended', outcome: 'won' });
+  await seedSave(page, won);
+  await page.goto('/');
+  const card = page.getByRole('region', { name: 'Choose how you want to play' }).getByRole('region', { name: 'Challenge Mode' });
+  await expect(card).toContainText('Series A secured');
+  await card.getByRole('button', { name: 'See your results', exact: true }).click();
+  await expectRoom(page);
+
+  const report = page.getByRole('dialog', { name: 'Series A secured' });
+  const keep = report.getByRole('button', { name: 'Keep playing', exact: true });
+  await expect(keep).toBeFocused();
+  await expect(report.getByRole('button', { name: 'Play again', exact: true })).toBeVisible();
+  await keep.click();
+  await expect(report).toBeHidden();
+
+  const time = page.getByRole('group', { name: 'Time' });
+  await expect(time).toContainText(`Week ${won.turn}`);
+  await expect(time).not.toContainText(`/${BALANCE.maxTurns}`);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const glance = page.getByRole('dialog', { name: 'Menu' }).getByRole('region', { name: 'At a glance' });
+  // The week has no total once there is no deadline.
+  await expect(glance.getByRole('definition').first()).toHaveText(String(won.turn));
+  await page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Resume', exact: true }).click();
+  expect(await savedGame(page)).toMatchObject({ phase: 'management', outcome: null, seriesAWeek: won.totals.weeks });
+
+  // The growing company outgrows its database in its first week past the Series A, so play carries on as normal.
+  await time.getByRole('button', { name: 'Next week', exact: true }).click();
+  await expect(page.getByRole('button', { name: /incident clock/ })).toBeVisible();
+  expect(await savedGame(page)).toMatchObject({ phase: 'incident', seriesAWeek: won.totals.weeks });
+
+  await page.reload();
+  await expect(card).toContainText(`Week ${won.turn}: Series A secured`);
+  await card.getByRole('button', { name: `Continue week ${won.turn}`, exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Resume the incident clock' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Series A secured' })).toHaveCount(0);
 });

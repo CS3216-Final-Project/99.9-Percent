@@ -3,15 +3,19 @@ import { CampaignAttentionHost } from "./CampaignAttention";
 import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import { PendingDeployments } from "./PendingDeployments";
+import { AutoscaleCallout } from "./AutoscaleCallout";
 import "./ControlsDock.css";
 
-import { lazy, Suspense, useEffect } from "react";
-import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { completedTechIds, metrics, TECH_ORDER, userGoal, weekLimit } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { healthOf } from "./health";
+import { usersGoalTip } from "./presentation";
 import { SoundButton } from "./SoundButton";
+import { AppProfileButton, AppProfilePicker } from "./AppProfile";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
 import { HomeScreen } from "./HomeScreen";
@@ -48,6 +52,7 @@ export function TopBar() {
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
+  const goal = userGoal(game);
 
   return (
     <header className={`topbar${inc ? " is-incident" : ""}`}>
@@ -60,13 +65,15 @@ export function TopBar() {
           <strong className={game.cash < 10_000 ? "text-critical" : ""}>{money(game.cash)}</strong>
           <span className={m.net >= 0 ? "text-ok" : "text-warn"}>{signedMoney(m.net)}/wk</span>
         </Stat>
-        <Stat icon="users" kind="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
+        <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
           <strong>{num(game.users)}</strong>
-          <span className="stat-goal">
-            <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
-            <Icon name="goal" size={12} />
-            <span className="muted">{compact(BALANCE.targetUsers)}</span>
-          </span>
+          {goal !== null && (
+            <span className="stat-goal">
+              <Meter value={game.users / goal} label={`Progress to ${num(goal)} users`} />
+              <Icon name="goal" size={12} />
+              <span className="muted">{compact(goal)}</span>
+            </span>
+          )}
         </Stat>
         <Stat icon="revenue" kind="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
           <strong>{money(m.revenue)}</strong>
@@ -83,6 +90,7 @@ export function TopBar() {
         </Stat>
       </div>
 
+      <AppProfileButton />
       <SoundButton />
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" {...tipProps("Menu")}>
         <Icon name="menu" />
@@ -99,7 +107,9 @@ export function TopBar() {
 function WeekClock() {
   const game = useGame((s) => s.game);
   const inc = game.phase === "incident" ? game.incident : null;
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  // Past the Series A there is no last week: the count runs on and the strip of weeks left goes.
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   return (
     <div className={`week${inc ? " is-incident" : ""}`}>
       <span className="brand-week">
@@ -110,15 +120,17 @@ function WeekClock() {
           </>
         ) : (
           <>
-            Week <strong>{week}</strong>/{BALANCE.maxTurns}
+            Week <strong>{week}</strong>{limit !== null && `/${limit}`}
           </>
         )}</span>
       </span>
-      <span className="week-track" aria-hidden="true">
-        {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
-          <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
-        ))}
-      </span>
+      {limit !== null && (
+        <span className="week-track" aria-hidden="true">
+          {Array.from({ length: limit }, (_, i) => (
+            <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
+          ))}
+        </span>
+      )}
     </div>
   );
 }
@@ -177,27 +189,66 @@ export function ClassicViewSheet() {
   );
 }
 
+/** The dialog open on top, watched only while `watching`. */
+function useOpenModal(watching: boolean) {
+  const [modal, setModal] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!watching) return;
+    const find = () => setModal(Array.from(document.querySelectorAll<HTMLElement>(".modal")).at(-1) ?? null);
+    find();
+    const observer = new MutationObserver(find);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => { observer.disconnect(); setModal(null); };
+  }, [watching]);
+  return watching ? modal : null;
+}
+
 export function ToastHost() {
   const toast = useGame((s) => s.toast);
   const dismiss = useGame((s) => s.dismissToast);
+  // Over an open dialog the toast is in it, as screen readers hear nothing outside it. A dialog reaching down to where
+  // the toast floats takes it as its last row instead, as compact as its own messages, so it covers none of the
+  // dialog's actions; later toasts take the same row. The row stays until it is pressed, replaced or its dialog closes:
+  // leaving on a timer would move the actions back under the pointer, and a repeated note, such as an autosave failing
+  // every ten seconds, would move them each time.
+  const modal = useOpenModal(!!toast), note = useRef<HTMLDivElement>(null);
+  const [joined, setJoined] = useState<HTMLElement | null>(null);
+  const inline = !!modal && joined === modal;
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || inline) return;
     const t = window.setTimeout(dismiss, toast.kind === "error" ? 5200 : 2800);
     return () => window.clearTimeout(t);
-  }, [toast, dismiss]);
+  }, [toast, dismiss, inline]);
+  // A row goes with its dialog rather than floating on over what is left.
+  const host = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (inline) host.current = modal;
+    else if (host.current) { host.current = null; if (toast) dismiss(); }
+  }, [inline, modal, toast, dismiss]);
+  useLayoutEffect(() => {
+    const el = note.current;
+    setJoined(modal && el && modal.getBoundingClientRect().bottom > innerHeight - parseFloat(getComputedStyle(el).bottom) - el.offsetHeight ? modal : null);
+  }, [modal, toast]);
+  useLayoutEffect(() => {
+    // The row takes its room from the dialog's scrolling body, which must not hide the control just pressed.
+    const active = document.activeElement;
+    if (inline && active instanceof HTMLElement && modal?.contains(active)) active.scrollIntoView({ block: "nearest" });
+  }, [inline, modal, toast]);
   if (!toast) return null;
-  return (
-    <div className="toast" onClick={dismiss}>
+  const body = (
+    <div ref={note} className={`toast${inline ? " toast-inline" : ""}`} onClick={dismiss}>
       <Callout
+        compact={inline}
         tone={toast.kind === "error" ? "critical" : toast.kind === "success" ? "success" : "info"}
-        icon={toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
-        kicker={toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
+        icon={toast.milestone ? "goal" : toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
+        kicker={toast.milestone ? "Milestone" : toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
         live={toast.kind === "error" ? "alert" : "status"}
       >
         {toast.text}
       </Callout>
     </div>
   );
+  return modal ? createPortal(body, modal) : body;
 }
 
 /** The boot screen, shown until the store has loaded the saved settings and game. */
@@ -228,11 +279,12 @@ export default function Game() {
       <main className="stage">
         <Room />
       </main>
-      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><MachineAlerts /><SidePanel /><ClassicViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /><AutoscaleCallout /></>}<CampaignControls /><CampaignOverlays /></> : <><MachineAlerts /><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}
       {!campaign && started && onboarding && <HowToPlay />}
+      {!campaign && <AppProfilePicker />}
       {started && <Tutorial />}
       {started && <InspectionReveal />}
       {!campaign && started && phase === "review" && <PostmortemModal />}

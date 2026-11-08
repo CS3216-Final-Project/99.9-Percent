@@ -5,7 +5,6 @@ import { newGame, newLegacyGame } from "@/sim";
 import { act as decide, tick, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { preventedOpening, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
 import { chapterCompanyMessage } from "@/game/chapterCompanyMessage";
 import { makeEnvelope, decodeSave } from "@/game/saveEnvelope";
@@ -16,8 +15,8 @@ import { CampaignHeader, CampaignPanel, CampaignControls } from "./CampaignUI";
 import Tutorial from "./Tutorial";
 import { setConfirming } from "./actionConfirmation";
 
-const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability(), combinedCompany()];
-const senders = [["Maya", "Customer Support"], ["Alex", "CEO"], ["Jordan", "Software Engineer"], ["Sam", "Marketing"], ["Taylor", "Operations Engineer"], ["Alex", "CEO"]];
+const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability()];
+const senders = [["Maya", "Customer Support"], ["Alex", "CEO"], ["Jordan", "Software Engineer"], ["Sam", "Marketing"], ["Taylor", "Operations Engineer"]];
 const message = () => screen.queryByRole("dialog", { name: "Company Message" });
 const next = () => within(message()!).queryByRole("button", { name: "Next" });
 /** Advances through the colleague's lines to the mission, then acknowledges it. */
@@ -82,18 +81,16 @@ it("advances one line at a time from the dialogue box and keeps the mission unti
   expect(message()!.querySelectorAll(".dialogue-progress > [data-read]")).toHaveLength(model.lines.length);
 });
 
-it("lets the player select text without reading on, and reads on with Enter while the dialogue itself has focus", () => {
+it("reads on by clicking the dialogue's text, and with Enter while the dialogue itself has focus", () => {
   const model = chapterCompanyMessage(companies[3])!;
   render(<ChapterCompanyMessage model={model} enabled/>);
-  const copy = message()!.querySelector(".dialogue-copy")!, line = copy.querySelector(".dialogue-line")!;
-  expect(fireEvent.mouseDown(copy)).toBe(true);
-  window.getSelection()!.selectAllChildren(line); fireEvent.click(line);
-  expect(copy.textContent).toContain(model.lines[0]);
-  window.getSelection()!.removeAllRanges();
+  const copy = message()!.querySelector(".dialogue-copy")!;
   message()!.focus(); fireEvent.keyDown(message()!, { key: "Enter" });
   expect(copy.textContent).toContain(model.lines[1]);
   fireEvent.keyDown(message()!, { key: "Tab", shiftKey: true });
   expect(document.activeElement).toBe(next());
+  fireEvent.click(copy.querySelector(".dialogue-line")!);
+  expect(copy.textContent).toContain(model.lines[2]);
 });
 
 it("preloads every portrait of the scene and hides a portrait that fails to load", () => {
@@ -149,14 +146,10 @@ it("welcomes a new company from Maya before its introduction, and Opening then s
   expect(chapterCompanyMessage(newGame())!.lines[0]).toContain("I'm Maya");
 });
 
-it("uses truthful Opening copy and the actual final target", () => {
+it("uses truthful Opening copy", () => {
   const said = (game: Parameters<typeof chapterCompanyMessage>[0]) => chapterCompanyMessage(game)!.lines.join(" ");
   const healthy = newGame(); expect(said(healthy)).not.toContain("reporting");
   expect(said(tick(healthy, 5))).toContain("getting slower");
-  const custom = structuredClone(companies[5]); custom.campaign!.combinedStage!.finalUserTarget = 75000;
-  expect(said(custom)).toContain("75,000"); expect(said(custom)).not.toContain("50,000");
-  custom.campaign!.combinedStage!.users = 75000;
-  expect(said(custom)).toContain("finish the final Campaign checks");
   expect(chapterCompanyMessage(newLegacyGame())).toBeNull();
 });
 

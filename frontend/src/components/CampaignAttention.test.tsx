@@ -12,7 +12,6 @@ import { setConfirming } from "./actionConfirmation";
 import { TooltipLayer } from "./Tooltip";
 import { act as decide, tick, dataCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { INTRODUCTION_COMPONENTS } from "@/sim/introduction";
 
 beforeEach(() => {
@@ -57,20 +56,35 @@ it("uses the shared ten-second deadline for the growth explanation, then a fresh
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
+it("does not retire the Hint label when Hint is opened during the introduction", () => {
+  show(decide(newGame(7, "intro-hint", 2), { type: "begin_introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
+  expect(useGame.getState().meta.tipsSeen).not.toContain("hint");
+});
+it("labels Hint's glow only for a player who has never opened Hint", () => {
+  useGame.setState({ meta: { ...useGame.getState().meta, tipsSeen: ["hint"] } });
+  show(scaling()); act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  expect(screen.queryByText("Press Hint to see what to try next.")).toBeNull();
+});
 it.each([
   ["chapter Next", dataCompany, /^Next:/],
   ["reliability start", reliabilityCompany, "Start reliability test"],
-  ["growth start", () => tick(combinedCompany(), 5), "Start next growth wave"],
 ] as const)("gives %s sole progression attention without dispatching", (_name, make, name) => {
   show(make()); const before = useGame.getState().game;
   act(() => vi.advanceTimersByTime(10000)); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name })); expect(useGame.getState().game).toBe(before);
 });
+const acceptRisk = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
+};
 it("lights Run after a decision pauses a company that could keep running, clearing when it restarts", () => {
-  show(tick(combinedCompany(), 5));
+  show(scaling());
   act(() => useGame.getState().setRunning(true));
   expect(useGame.getState().running).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  acceptRisk();
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name: "Run" }));
@@ -79,18 +93,19 @@ it("lights Run after a decision pauses a company that could keep running, cleari
   expect(gold()).toHaveLength(0);
 });
 it("shows no Run invitation for a decision that pauses an already-paused company", () => {
-  show(tick(combinedCompany(), 5));
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  show(scaling());
+  acceptRisk();
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(0);
 });
 it("shows no Run invitation when a modal owns the pause, and does not replay it afterwards", async () => {
-  show(tick(combinedCompany(), 5));
+  show(scaling());
   act(() => useGame.getState().setRunning(true));
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
   document.body.append(modal);
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(0);
   await act(async () => { modal.remove(); });
@@ -294,13 +309,6 @@ it("offers both real growth strategies and transfers accepted risk without dispa
   fireEvent.click(gold()[0]); expect(useGame.getState().game.campaign!.scalingConsent).toEqual({ policyVersion: 1, acceptedStep: before.campaign!.step });
   expect(gold()).toHaveLength(0);
 });
-it("lights Run after accepting the growth risk pauses a running company", () => {
-  show(scaling()); act(() => useGame.getState().setRunning(true));
-  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
-  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
-  expect(useGame.getState().running).toBe(false);
-  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
-});
 it("offers only the valid risk strategy when database preparation is unaffordable", () => {
   const game = scaling(); game.campaign!.cashCents = 1; show(game);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -353,6 +361,7 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   const message = screen.getByRole("dialog", { name: "Company Message" });
   fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
   expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Run, then observe");
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).not.toContain("scheduled growth");
   spotOn("Run");
   fireEvent.click(lit()[0]);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 1), running: true }));
@@ -366,8 +375,13 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   noSpot();
   act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  // Hint's first advice labels its glow, without pausing anything or taking the clicks.
+  expect(screen.getByText("Press Hint to see what to try next.").closest('[role="status"]')?.textContent).toBe("Stuck?Press Hint to see what to try next.");
+  expect(useGame.getState().tour).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("dialog", { name: "Hint" }).textContent).toContain("Your database is overloaded. Upgrade it to handle more requests.");
+  expect(screen.queryByText("Press Hint to see what to try next.")).toBeNull();
+  expect(useGame.getState().meta.tipsSeen).toContain("hint");
   acceptHint();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
   fireEvent.click(gold()[0]);

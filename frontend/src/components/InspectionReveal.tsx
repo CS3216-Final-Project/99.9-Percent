@@ -15,6 +15,14 @@ import { campaignAppHealth } from "@/game/campaignAppHealth";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { Meter, Modal, Row } from "./ui";
 import { takeOrigin } from "./inspectionOrigin";
+import { Settled } from "./CountUp";
+import { useCountUp } from "./useCountUp";
+
+/** The Network's traffic this second, counting to each new second's figures like the readings below it. */
+function GatewayTraffic({ incoming, admitted, rejected }: { incoming: number; admitted: number; rejected: number }) {
+  const text = (i: number, a: number, r: number) => `${num(i)} incoming / ${num(a)} admitted / ${num(r)} rejected requests/s`;
+  return <Settled shown={text(useCountUp(incoming), useCountUp(admitted), useCountUp(rejected))} final={text(incoming, admitted, rejected)} />;
+}
 
 /**
  * The diagnostic card an inspection started in the 3D room opens: the equipment's scanner on the left, the
@@ -136,7 +144,7 @@ function ComponentInspection() {
   const health=campaignAppHealth(game);
   const unit=place==="db"?"operations/s":"requests/s";
   let stateKey: keyof typeof STATE_META=info.state;
-  let word=STATE_META[stateKey].word, metric=info.summary, description=info.about;
+  let word=STATE_META[stateKey].word, metric: ReactNode=info.summary, description=info.about;
   if (failed) {
     stateKey="down";word="Down";
     metric=`0 available / ${num(installed?.capacity??0)} installed requests/s`;
@@ -162,7 +170,7 @@ function ComponentInspection() {
     description=health.interpretation;
   } else if (place==="gateway") {
     stateKey=c.limit===null?"ok":"warn";word=c.limit===null?"Healthy":"Traffic limited";
-    metric=`${num(m.incoming)} incoming / ${num(m.admitted)} accepted / ${num(m.rejected)} rejected requests/s`;
+    metric=<GatewayTraffic incoming={m.incoming} admitted={m.admitted} rejected={m.rejected}/>;
     description=c.limit===null?"All incoming traffic is admitted.":"Traffic limiting protects capacity but rejects customers; rejected requests earn no revenue.";
   }
   const routes=c.reliabilityStage?effectiveTargets(c):c.routing.targets;
@@ -185,7 +193,9 @@ function ComponentInspection() {
   const appManagement=place==="app"&&page==="management";
   const server=place==="app"&&page==="server";
   const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
-  const title=place==="app"?"App Servers":info.name;
+  // The title names the view on screen; the back control and equipment icon keep the way out.
+  const title=place==="app"?(page==="server"?serverName(selected.id):page==="management"?"Server management":page==="autoscaling"?"Autoscaling":"App Servers")
+    :place==="gateway"&&page!=="overview"?"Network management":info.name;
   const lens=details?"zoomOut":"zoomIn";
   // The disc is the machine and the way into its readings: under the pointer a glowing magnifier lies over the machine, and
   // pressing it turns it over, opening the readings below the actions. Its back is the machine again, with a closing
@@ -204,7 +214,7 @@ function ComponentInspection() {
         </span>
         <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
       </button>
-      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>{serverName(selected.id)}</span>}</p>
+      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span></p>
       <p className="component-inspection-metric">{metric}</p>
       {component&&component.capacity>0&&<Meter value={component.demand/component.capacity} tone={state.tone==="muted"?"accent":state.tone} label={`${place==="db"?"Database":"Server"} load`}/>}
       <p>{description}</p>
@@ -217,31 +227,26 @@ function ComponentInspection() {
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
   return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
-    {!overview&&place!=="gateway"&&back}
+    {!overview&&back}
     {appManagement?<>
-      <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
       <dl className="inspection-fleet-summary" aria-label="Server counts"><Row label="Installed" value={c.apps.length}/><Row label="Healthy" value={c.apps.filter(a=>a.health!=="failed").length}/><Row label="Currently routed" value={routes.length}/></dl>
       <section aria-label="Application instances" className="inspection-server-cards">{c.apps.map(a=><button type="button" key={a.id} data-guidance-app={a.id} className="inspection-server-card" data-health={a.health??"healthy"} aria-pressed={selectedAppId===a.id} aria-label={`${serverName(a.id)}: ${a.health??"healthy"}; ${routes.includes(a.id)?"Receiving traffic":"Installed - not receiving traffic"}`} onClick={()=>inspectInRoom("app",a.id)}><strong><Icon name="server" size={16}/>{serverName(a.id)}</strong><span className="inspection-server-health">{a.health??"healthy"}</span><span className="inspection-server-route" data-routed={routes.includes(a.id)}>{a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Not receiving traffic"}</span></button>)}</section>
       {warning&&<p role="note" className="inspection-warning">{warning}</p>}
       <div className="component-inspection-controls">{c.spikeStage?entry("autoscaling","Autoscaling"):<p className="inspection-autoscaling-info"><Icon name="info" size={16}/><span>Autoscaling becomes available in Traffic Spikes.</span></p>}</div>
       {technical()}
     </>:server?<>
-      <h3 tabIndex={-1}>{serverName(selected.id)}</h3>{summary}
+      {summary}
       <dl className="rows"><Row label="Installed capacity" value={`${num(selected.capacity)} requests/s`}/><Row label="Current demand" value={instance?`${num(instance.demand)} requests/s`:"Not yet observed"}/><Row label="Routing" value={routes.includes(selected.id)?"Receiving traffic":selected.role==="spare"?"Standby spare":"Not receiving traffic"}/></dl>
       {controls("server")}{detailsArea(reading(selected.id))}
     </>:place==="app"&&page==="autoscaling"?<>
-      <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
+      <p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
-      <div className="inspection-management-header">
-        <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
-        {back}
-      </div>
       {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
-        <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
-        <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
+        <section aria-label="Load balancing"><h3>Load balancing</h3>{controls("balancing")}</section>
+        <section aria-label="Routing"><h3>Routing</h3>{controls("routing")}</section>
       </>}
-      <section aria-label="Automatic failover"><h4>Automatic failover</h4>
+      <section aria-label="Automatic failover"><h3>Automatic failover</h3>
         {!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:controls("failover")}</section>
     </>:<>
       {summary}

@@ -1,0 +1,39 @@
+/* Placed every frame beside the label of the server the autoscaler changed; hidden while that label is off screen. */
+.autoscale-callout {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  width: min(280px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border: 1px solid var(--focus);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--lift);
+  will-change: transform;
+}
+.autoscale-callout[data-anchored="false"] { visibility: hidden; }
+.autoscale-callout-head { display: flex; align-items: center; gap: 8px; }
+.autoscale-callout-head > .icon { flex: none; color: var(--focus); }
+.autoscale-callout-head strong { flex: 1; font-family: var(--font-display); font-size: var(--text-md); line-height: 1.2; }
+.autoscale-callout-head .icon-btn { flex: none; margin: -6px -6px -6px 0; }
+.autoscale-callout p { margin: 6px 0 0; font-size: var(--text-sm); line-height: 1.45; }
+/* The tail points at the server's label, above or below the card. */
+.autoscale-callout::after {
+  content: "";
+  position: absolute;
+  left: var(--tail-x, 50%);
+  width: 12px;
+  height: 7px;
+  margin-left: -6px;
+  background: var(--focus);
+}
+.autoscale-callout[data-side="above"]::after { top: 100%; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.autoscale-callout[data-side="below"]::after { bottom: 100%; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+@media (prefers-reduced-motion: no-preference) {
+  .autoscale-callout[data-anchored="true"] { animation: autoscale-callout-in 0.2s ease-out; }
+}
+@keyframes autoscale-callout-in { from { opacity: 0; } }
+/* The label of the server being changed glows while its callout is up. */
+.eq-label.is-autoscaling { background: #fff; outline: 3px solid var(--focus); outline-offset: 1px; }

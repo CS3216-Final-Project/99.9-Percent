@@ -82,7 +82,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await purchase.getByRole("button", { name: "Cancel", exact: true }).click();await closeInspection(page);
     await entry.click();await expect(dialog).toBeVisible();await page.keyboard.press("Escape");
     await page.getByRole("main").getByRole("button", { name: "Servers", exact: true }).click();
-    const inspection = page.getByRole("dialog", { name: "App Servers", exact: true });
+    const inspection = page.locator(".component-inspection-app");
     await expect(inspection).toBeVisible(); await inspection.getByRole("button", { name: "Close", exact: true }).click();
     expect((await savedGame(page)).campaign!.cashCents).toBe(before!.cashCents);
     await page.reload();

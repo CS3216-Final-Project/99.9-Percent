@@ -1,5 +1,5 @@
 import { infrastructureAction, inspectEquipment, closeInspection } from "./componentInspection";
-import { test, expect, seedSave, savedGame } from "./fixtures";
+import { test, expect, openDisclosure, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 import { tick } from "../src/sim/__tests__/spikeFixtures";
 
@@ -22,9 +22,9 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await finance.getByText("Advanced details",{exact:true}).click();await finance.getByText("Detailed running costs",{exact:true}).click();await expect(finance.getByRole("table")).toContainText("Employee salaries");
     await expect(finance.getByText("Last period's result does not include purchases.")).toBeVisible();
     await page.screenshot({path:"test-results/finance-desktop.png"});
-    await finance.getByText("How estimates work",{exact:true}).click();
-    await finance.getByText(/This is a budget estimate, not a bankruptcy deadline/).scrollIntoViewIfNeeded();
-    await expect(finance.getByText(/This is a budget estimate, not a bankruptcy deadline/)).toBeInViewport();
+    await openDisclosure(finance.getByText("How estimates work",{exact:true}));
+    const estimate=finance.getByText(/This is a budget estimate, not a bankruptcy deadline/);
+    await estimate.scrollIntoViewIfNeeded();await expect(estimate).toBeInViewport();
     await page.keyboard.press("Escape");await expect(page.getByRole("button",{name:"View finances"})).toBeFocused();
     expect((await savedGame(page)).campaign).toEqual(before.campaign);
     const add=await infrastructureAction(page,/Add server/),beforePurchase=await savedGame(page);await add.click();

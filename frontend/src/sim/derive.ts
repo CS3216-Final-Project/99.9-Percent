@@ -4,6 +4,7 @@ import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
 import { openingTuning } from "./launchWeek";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
+import { appProfile } from "./appProfiles";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
 import { serverName } from "./names";
 
@@ -54,13 +55,17 @@ export function dbCapacity(s: GameState): number {
   return tier.capacity * (has(s, "replicas") ? BALANCE.db.replicaCapacityMult : 1);
 }
 
+/** Share of the app's database work the read cache absorbs (0 without one): capped by what the app can cache. */
+export function cacheRelief(s: GameState): number {
+  if (s.campaign || !has(s, "caching")) return 0;
+  const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
+  return Math.min(appProfile(s).cacheEligibleShare, reduction) * clamp(s.cacheWarmth ?? 1, 0, 1);
+}
+
 /** Database queries generated per request that the app tier serves. */
 export function dbLoadFactor(s: GameState): number {
   if(s.campaign)return 1;
-  const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
-  const eligibleReduction = Math.min(BALANCE.db.cacheEligibleShare, reduction);
-  const warmth = clamp(s.cacheWarmth ?? 1, 0, 1);
-  return BALANCE.db.queriesPerRequest * (has(s, "caching") ? 1 - eligibleReduction * warmth : 1);
+  return BALANCE.db.queriesPerRequest * appProfile(s).dbLoad * (1 - cacheRelief(s));
 }
 
 export interface Utilisation {
@@ -135,7 +140,7 @@ export function costs(s: GameState, tempServers = 0): CostBreakdown {
 }
 
 export function arpu(s: GameState): number {
-  return BALANCE.arpu * (has(s, "analytics") ? BALANCE.analyticsArpuBonus : 1);
+  return BALANCE.arpu * appProfile(s).revenue * (has(s, "analytics") ? BALANCE.analyticsArpuBonus : 1);
 }
 
 export function weeklyRevenue(s: GameState): number {
@@ -208,7 +213,17 @@ export function fixEffort(release: Pick<Release, "size">): number {
 
 export function promoUsers(s: GameState, id: PromoId): number {
   const quality = clamp(s.satisfaction / 80, 0.5, 1.1);
-  return Math.round(s.users * PROMOS[id].userGain * quality);
+  return Math.round(s.users * PROMOS[id].userGain * appProfile(s).promoGain[id] * quality);
+}
+
+/** Extra peak traffic a promotion brings this company in the week it runs (0.3 = +30%). */
+export function promoSpike(s: Pick<GameState, "appProfile">, id: PromoId): number {
+  return PROMOS[id].spike * appProfile(s).promoSpike[id];
+}
+
+/** Peak requests per second each of this company's users makes. */
+export function rpsPerUser(s: Pick<GameState, "appProfile">): number {
+  return BALANCE.rpsPerUser * appProfile(s).traffic;
 }
 
 export function promoCost(s: GameState, id: PromoId): number {
@@ -240,13 +255,13 @@ export function forecast(s: GameState): Forecast {
   let mult = 1;
   for (const id of s.activePromos) {
     users += promoUsers(s, id);
-    mult *= 1 + PROMOS[id].spike;
+    mult *= 1 + promoSpike(s, id);
   }
   if (s.upcomingSurge && s.upcomingSurge.turn === s.turn) {
     users += Math.round(s.users * s.upcomingSurge.users);
     mult *= s.upcomingSurge.mult;
   }
-  const peakLow = users * BALANCE.rpsPerUser * mult;
+  const peakLow = users * rpsPerUser(s) * mult;
   const peakHigh = peakLow * (1 + BALANCE.trafficNoise);
   const tempServers = autoscaleServers(s, peakHigh);
   const low = utilisation(s, peakLow, tempServers);
@@ -281,6 +296,29 @@ export function organicRate(satisfaction: number): number {
 
 export function churnRate(satisfaction: number): number {
   return BALANCE.growth.baseChurn + Math.max(0, 70 - satisfaction) * BALANCE.growth.churnPerSatPoint;
+}
+
+/** Challenge Mode's last week, or null once the Series A is secured and the company plays on without one. */
+export function weekLimit(s: GameState): number | null {
+  return s.seriesAWeek === undefined ? BALANCE.maxTurns : null;
+}
+
+/** Challenge Mode's user goals: the Series A target, then the milestones a company that plays on past it climbs. */
+export const USER_MILESTONES: readonly number[] = [BALANCE.targetUsers, 100_000, 1_000_000, 10_000_000, 100_000_000];
+
+/**
+ * The user count Challenge Mode's Users meter climbs towards: the Series A target until it is secured, then the first
+ * milestone above the company's peak, or null once it has passed the last. Measured from the peak, so a goal reached
+ * stays reached when users dip.
+ */
+export function userGoal(s: GameState): number | null {
+  if (s.seriesAWeek === undefined) return BALANCE.targetUsers;
+  return USER_MILESTONES.find((m) => m > s.totals.peakUsers) ?? null;
+}
+
+/** A Challenge Mode run that has just secured its Series A, and so may carry on past it. */
+export function canKeepPlaying(s: GameState): boolean {
+  return !s.campaign && s.phase === "ended" && s.outcome === "won" && s.seriesAWeek === undefined;
 }
 
 /** Overall availability across the run, as a fraction (0.9995 = 99.95%). */
@@ -605,7 +643,7 @@ export function equipmentInfo(s: GameState, id: EquipmentId): EquipmentInfo {
         "Cache",
         "Answers repeat requests so the database does not have to.",
         "caching",
-        `-${pct(1 - dbLoadFactor(s) / BALANCE.db.queriesPerRequest)} database load`,
+        `-${pct(cacheRelief(s))} database load`,
       );
     case "db": {
       let state = utilState(m.dbUtil);

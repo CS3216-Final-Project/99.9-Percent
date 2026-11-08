@@ -10,6 +10,7 @@ import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
 import { campaignAbout, MODES, useModeLauncher, useModeSummaries, type ModeInfo, type Summary } from "./homeModes";
+import { loseWording } from "./useModeSwitch";
 import "./HomeScreen.css";
 
 /** Chapter 5, Stay Online, unlocks Challenge Mode. */
@@ -27,10 +28,10 @@ function ChallengeTeaser({ guided }: { guided: Summary }) {
     <div className="mode-teaser-text">
       <h2 id="classic-heading">{MODES.classic.name}</h2>
       <p>Grow to {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks on your own.</p>
-      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 6.`}</p>
+      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 5.`}</p>
     </div>
     <ol className="mode-teaser-pips" aria-hidden="true">
-      {[1, 2, 3, 4, 5, 6].map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
+      {[1, 2, 3, 4, 5].map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
     </ol>
   </section>;
 }
@@ -125,7 +126,10 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
   canExport?: boolean;
 }) {
   const heading = `${mode}-heading`;
-  const label = unsaved ? "Switch and lose this run" : summary.continueLabel;
+  // A switch to this card's mode is only refused while the other mode is loaded, so it is the other mode's save at risk.
+  const other: GameMode = mode === "campaign" ? "classic" : "campaign";
+  const lose = loseWording(other);
+  const label = unsaved ? lose.button : summary.continueLabel;
   // A Guided Mode company that has ended can start over from here; a Challenge Mode run can at any time.
   const canRestart = mode === "classic" ? summary.resumable : summary.ended;
   // Starting over replaces the save, so it asks for a second press, as the menu does.
@@ -168,7 +172,7 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
         This replaces your {mode === "classic" ? "Challenge Mode run" : "finished Guided Mode company and its final report"}. Press the button again to confirm.
       </Callout>}
       {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved" live="alert">
-        Your other run could not be saved, so switching now loses it. Press "{label}" again to switch anyway{canExport ? ", or continue that run and export it from Menu, Saves first" : ""}.
+        {lose.warning(`Your ${MODES[other].name} ${lose.noun}`, canExport ? `, or continue that ${lose.noun} and export it from Menu, Saves first` : "")}
       </Callout>}
       {/* A closed company has no Opening left to walk through. */}
       {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay Launch Week" : "Replay tutorial"}</button>}

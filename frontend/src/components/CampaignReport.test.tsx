@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act as rtlAct, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { newGame } from "@/sim";
 import { captureScorecard } from "@/sim/campaignScorecard";
-import { act, tick } from "@/sim/__tests__/spikeFixtures";
-import { combinedCompany, finishRound, finishedCompany } from "@/sim/__tests__/combinedFixture";
+import { act, spikeCompany, tick, untilOffset } from "@/sim/__tests__/spikeFixtures";
+import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { useGame } from "@/game/store";
 import { CampaignOverlays } from "./CampaignUI";
 import CampaignScorecard from "./CampaignScorecard";
@@ -33,28 +33,47 @@ it("keeps prevention evidence in one accordion and acknowledges the same company
   expect(useGame.getState().game.campaign!.step).toBe(game.campaign!.step);
 });
 
-it("preserves growth review evidence and explicit acknowledgement", () => {
-  const game = finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
+it("completes the campaign from Stay Online's outcome and resets the single accordion on the scorecard", () => {
+  const game = reliabilityOutcome();
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
-  const details = checkReport();
-  expect(details.querySelector("pre")).toBeNull();
-  expect(within(details).getByText("Started game second")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
-  expect(useGame.getState().game.campaign!.combinedStage!.completedRounds.at(-1)!.acknowledged).toBe(true);
-  expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);
-});
-
-it("keeps final review explicit and resets the single accordion on completion", () => {
-  const game = finishedCompany();
-  useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
-  const details = checkReport();
-  fireEvent.click(within(details).getByText("View Technical Details"));
-  expect(details.textContent).toContain("50,000");
+  const outcome = screen.getByRole("dialog", { name: "Reliability outcome" });
+  fireEvent.click(within(outcome).getByText("View Technical Details"));
   expect(useGame.getState().game.outcome).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Complete campaign" }));
+  fireEvent.click(within(outcome).getByRole("button", { name: "Complete campaign" }));
   expect(useGame.getState().game.outcome).toBe("won");
   fireEvent.click(within(screen.getByRole("dialog", { name: "Campaign finale" })).getByRole("button", { name: "Skip to the scorecard" }));
   checkReport();
+  expect(screen.getByRole("region", { name: "Run scorecard" }).textContent).toContain("Campaign complete");
+});
+
+const speakers = (dialog: HTMLElement) => {
+  const report = dialog.querySelector<HTMLElement>(".campaign-incident-report")!;
+  return { colleague: report.dataset.speaker, player: report.style.getPropertyValue("--report-player"), portrait: report.style.getPropertyValue("--report-colleague") };
+};
+
+it("has Maya ask an Opening postmortem's questions and the player's avatar answer them", () => {
+  let game = act(tick(newGame(1, "report-speakers"), 6), { type: "start_db_upgrade" });
+  while (game.phase !== "review") game = tick(game);
+  useGame.setState({ game, ready: true, started: true, hasRun: true, onboarding: false, tour: null, avatar: "dog" }); render(<CampaignOverlays/>);
+  fireEvent.click(screen.getByRole("button", { name: "View Incident Report" }));
+  expect(speakers(screen.getByRole("dialog", { name: "Incident postmortem" }))).toEqual({ colleague: "maya", player: 'url("/models/avatars/previews/dog.png")', portrait: 'url("/characters/maya.webp")' });
+});
+
+it("has Taylor ask Stay Online's outcome questions, and the answers follow a changed avatar", () => {
+  useGame.setState({ game: reliabilityOutcome(), ready: true, started: true, onboarding: false, avatar: "fox" }); render(<CampaignOverlays/>);
+  const outcome = () => screen.getByRole("dialog", { name: "Reliability outcome" });
+  expect(speakers(outcome())).toEqual({ colleague: "taylor", player: 'url("/models/avatars/previews/fox.png")', portrait: 'url("/characters/taylor.webp")' });
+  rtlAct(() => useGame.getState().setAvatar("panda"));
+  expect(speakers(outcome()).player).toBe('url("/models/avatars/previews/panda.png")');
+});
+
+it("has Sam ask a failed spike test's questions and the player's avatar answer them", () => {
+  const game = untilOffset(spikeCompany(false, "read-heavy", 2), 68);
+  useGame.setState({ game, ready: true, started: true, hasRun: true, onboarding: false, tour: null, avatar: "dog" }); render(<CampaignOverlays/>);
+  const dialog = screen.getByRole("dialog", { name: "Spike 2 test failed" });
+  expect(speakers(dialog)).toEqual({ colleague: "sam", player: 'url("/models/avatars/previews/dog.png")', portrait: 'url("/characters/sam.webp")' });
+  // Each question and then its answers pop up in turn, as in every other report.
+  expect([...dialog.querySelectorAll<HTMLElement>("section > *")].map(el => el.style.getPropertyValue("--turn"))).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
 });
 
 it("does not invent a recovery on a no-incident record, and retains all scorecard evidence", () => {

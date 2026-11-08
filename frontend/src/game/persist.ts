@@ -2,8 +2,8 @@ import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./teleme
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
 import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
-import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
-import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
+import { decodeSave, makeEnvelope } from "./saveEnvelope";
+import { APP_PROFILES, BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
 /**
  * Local browser persistence. Every read and write is wrapped because storage
@@ -35,7 +35,7 @@ let lastWrittenCampaign: string | null = null;
 export type GameMode = "campaign" | "classic";
 
 /** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
-export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
+export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability"] as const;
 export type ChapterTour = (typeof CHAPTER_TOURS)[number];
 /**
  * Chapter ends remembered for one company: Scaling & Routing and Data Strategy, announced once, and an Opening the
@@ -173,19 +173,24 @@ export function exportGame(game: GameState, remainderMs = 0, measurement: Measur
 export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measurement:Measurement=emptyMeasurement()):boolean {
   let current:string|null;
   try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
-  if(!explicitReset && current !== lastWrittenCampaign && !replaceable(current))return false;
+  // Never replace an existing save unless its payload can actually be replayed; bytes this session wrote already were.
+  const decoded=current===null||current===lastWrittenCampaign?null:decodeSave(current);
+  if(!explicitReset && decoded && decoded.status!=="ok")return false;
   // Back up the actual main-format bytes before upgrading the active slot.
   if (current !== null) {
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
+    const backup=SAVE_KEY+".backup.v"+source?.schemaVersion+"."+source?.runId+"."+source?.savedAt;
     try {
-      if(([1,2,3,4,5,6,7].includes(source?.schemaVersion) || (source?.schemaVersion === 8 && !source.serviceMeasurementStart)) && Array.isArray(source.inputs)) {
-        const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
+      if(Array.isArray(source?.inputs) && ([1,2,3,4,5,6,7].includes(source.schemaVersion) || (source.schemaVersion === 8 && !source.serviceMeasurementStart))) {
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;
         if(prior===null)window.localStorage.setItem(backup,current);
       }
     } catch { return false; }
+    // Play in the removed Grow the Company chapter is discarded on load and cannot be resumed by any build that
+    // saves here, so its original is kept only if there is room, and never stops the completed company saving.
+    if(decoded?.status==="ok" && decoded.retiredChapter && read(backup)===null)write(backup,current);
   }
   const raw = JSON.stringify(makeEnvelope(game,remainderMs,Date.now(),measurement));
   const saved = write(SAVE_KEY, raw);
@@ -231,10 +236,12 @@ function looksLikeClassicGame(g: unknown): g is GameState {
   return (
     s.version === SAVE_VERSION &&
     s.campaign === undefined &&
+    (s.appProfile === undefined || s.appProfile === null || (typeof s.appProfile === "string" && Object.hasOwn(APP_PROFILES, s.appProfile))) &&
     Number.isSafeInteger(s.turn) && s.turn! >= 1 &&
     [s.seed, s.rngState, s.cash, s.users, s.satisfaction, s.techDebt, s.engineers, s.nextId].every(Number.isFinite) &&
     typeof s.phase === "string" &&
     PHASES.has(s.phase) &&
+    (s.seriesAWeek === undefined || (Number.isSafeInteger(s.seriesAWeek) && s.seriesAWeek >= 1 && s.outcome !== "won")) &&
     !!s.infra &&
     Array.isArray(s.infra.appHosts) &&
     s.infra.appHosts.length > 0 &&
@@ -485,6 +492,8 @@ export type AnalyticsName =
   | "incident_completed"
   | "hint_used"
   | "run_finished"
+  | "endless_started"
+  | "endless_finished"
   | "voluntary_replay"
   | "rating_submitted"
   | "save_resumed"

@@ -2,7 +2,6 @@ import { expect, it } from "vitest";
 import { newGame } from "@/sim";
 import { captureScorecard } from "@/sim/campaignScorecard";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
-import { combinedCompany, finishRound, finishedCompany } from "@/sim/__tests__/combinedFixture";
 import { reliabilityOutcome } from "./__fixtures__/reliabilityOutcome";
 import { incidentSummary, outcomeSummary, scorecardSummary } from "./campaignReport";
 
@@ -49,23 +48,13 @@ it("uses observed failover and rejected traffic without inventing a manual resto
   expect(lesson.response).toContain("rejected");
 });
 
-it("keeps a completed growth wave bounded and explains full-demand verification", () => {
-  const g = finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
-  const c = g.campaign!, round = c.combinedStage!.currentRound!;
-  const lesson = outcomeSummary(c, "growth", round);
-  expect(lesson.happened).toContain("full-demand service");
-  c.trace.push({ id: c.nextEventId++, step: c.step + 1, type: "failover-activated", data: {} });
-  expect(outcomeSummary(c, "growth", round)).toEqual(lesson);
-});
-
 it("does not invent incidents or recovery actions for a no-incident scorecard record", () => {
   // A presentation boundary, not a claim that an incident-free Campaign route exists.
   const card = captureScorecard(newGame(), "won");
-  const summary = scorecardSummary(card, false);
+  const summary = scorecardSummary(card);
   expect(summary.happened).toBe("The Campaign objectives were completed.");
   expect(summary.response).toBe("No incidents appear in the retained record.");
-  expect(scorecardSummary(card, true).happened).toContain("final review");
-  expect(scorecardSummary({ ...card, outcome: "bankrupt" }, false).happened).toContain("ran out of cash");
+  expect(scorecardSummary({ ...card, outcome: "bankrupt" }).happened).toContain("ran out of cash");
 });
 
 it("does not attribute a same-second pre-entry action to the spike stage", () => {
@@ -76,9 +65,4 @@ it("does not attribute a same-second pre-entry action to the spike stage", () =>
   expect(summary.response).toContain("a traffic limit");
   expect(summary.response).toContain("Many incoming requests were rejected");
   expect(summary.response).not.toContain("traffic limit removal");
-});
-
-it("directs the last wave's takeaway to final goals rather than an invented fourth wave", () => {
-  const c = finishedCompany().campaign!, round = c.combinedStage!.completedRounds[2];
-  expect(outcomeSummary(c, "growth", round).improve).toBe("Compare service at full demand with your final Campaign goals.");
 });

@@ -21,6 +21,18 @@ async function chooseWalkMode(page: Page) {
   await menu.locator(":scope > summary").click();
   await walk(page).click();
 }
+/** Waits until the room draws steadily again (no frame gap over 1.5 s): a view change can hold the main thread for seconds on software WebGL. */
+async function steadyFrames(page: Page) {
+  await expect.poll(() => page.evaluate(() => new Promise<boolean>((done) => {
+    let last = performance.now(), n = 0;
+    const frame = (now: number) => {
+      if (now - last > 1_500) return done(false);
+      last = now;
+      if (++n === 4) done(true); else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  })), { timeout: 20_000 }).toBe(true);
+}
 /** The stored camera view, once its exact JSON has stayed unchanged for a beat longer than the write throttle. */
 async function settledView(page: Page): Promise<{ target: { x: number; z: number }; offset: { x: number; y: number; z: number }; zoom: number }> {
   let lastJson = "";
@@ -154,6 +166,8 @@ async function seedEavesdrop(page: Page) {
   await expect
     .poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 })
     .toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
 }
 
@@ -415,6 +429,8 @@ test("walks straight across the server hall where no machine has been fitted yet
     ),
   );
   await open(page);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await exploration(page))?.avatar?.z).toBe(-2.3);
   // Up walks away from the camera, diagonally across the empty places, into the cold aisle in front of the server.
@@ -433,6 +449,8 @@ test("walking leaves the camera in place", async ({ page }) => {
     ),
   );
   await open(page);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   const before = await settledView(page);
   const start = (await exploration(page))?.avatar as { x: number; z: number };
@@ -452,7 +470,7 @@ test("walking leaves the camera in place", async ({ page }) => {
   expect(after.target.z).toBeCloseTo(before.target.z, 3);
 });
 
-test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
+test("restores the mode, floor, avatar position and camera view after a reload, with walk mode off", async ({ page }) => {
   test.slow();
   await open(page);
   await chooseWalkMode(page);
@@ -480,18 +498,20 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   await page.reload();
   await page.getByRole("button", { name: "Continue week 2" }).click();
   await expectRoom(page);
-  // Mode, floor and walk mode are picked up exactly where they were left.
+  // Mode and floor are picked up where they were left; walk mode is not, since the game always opens in the overview.
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
-  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
-  // The avatar stands by Monitoring without being walked there again: the prompt is back in reach.
-  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 20_000 });
-  // And the camera came back to the same view: both labels return to their screen spots.
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "false");
+  // The camera came back to the same view: both labels return to their screen spots.
   await expect
     .poll(async () => Math.hypot((await labelCentre(page, "Monitoring")).x - monitoring.x, (await labelCentre(page, "Monitoring")).y - monitoring.y), { timeout: 20_000 })
     .toBeLessThan(4);
   await expect
     .poll(async () => Math.hypot((await labelCentre(page, "Database")).x - database.x, (await labelCentre(page, "Database")).y - database.y), { timeout: 20_000 })
     .toBeLessThan(4);
+  // Walk mode back on, the avatar stands by Monitoring without being walked there again: the prompt is back in reach.
+  await chooseWalkMode(page);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 20_000 });
   // Challenge Mode stays the last mode played, and the view record is its own, not the campaign's.
   expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
   // The campaign's record is still the one it started with: no walk, no spot, no camera.
@@ -507,6 +527,8 @@ test("makes a coffee by Space: the prompt says it is under way, sweeps for as lo
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Make a coffee", { timeout: 20_000 });
   await page.keyboard.press("Space");
@@ -533,6 +555,8 @@ test("plays the arcade: a real brick breaker served and steered, left by Escape"
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Play the arcade", { timeout: 20_000 });
   await page.keyboard.press("Space");
@@ -556,8 +580,10 @@ test("plays the arcade: a real brick breaker served and steered, left by Escape"
   await expect(prompt(page)).toContainText("Play the arcade");
 });
 
-test("naps in first person: eyes close and open", async ({ page }) => {
+test("naps in first person: eyes close and open", async ({ page, installClock }) => {
   test.slow();
+  // The nap runs on the page's clock, which keeps real time until the nap starts.
+  await installClock();
   // Resume mid-walk through the avatar's eyes, at the nap room's door.
   await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewpoint: "first", viewChosen: true, avatar: { floor: "office", x: 10.0, z: 6.6, yaw: Math.PI / 2 }, camera: null })));
   await page.goto("/");
@@ -565,12 +591,37 @@ test("naps in first person: eyes close and open", async ({ page }) => {
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; V twice goes through follow to first person, from the remembered spot.
+  await expect(page.locator(".view-overlay")).toHaveCount(0);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await page.keyboard.press("v");
   await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first", { timeout: 20_000 });
   await expect(prompt(page)).toContainText("Rest in a nap pod", { timeout: 20_000 });
+  await steadyFrames(page);
   const eyelids = page.locator(".view-eyelids");
+  // The lids follow the nap's own 9 s, sampled by the room's frames. Software WebGL has stalled frames for over 5 s
+  // as the view goes into the pod, longer than the lids stay shut, so the nap's time is held and each stretch drawn
+  // on purpose: a few frames at each point in the nap.
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1_000));
   await page.keyboard.press("Space");
-  // The lids close over the view as the avatar settles, then open again as it wakes.
-  await expect(eyelids).toHaveAttribute("data-eyes", "shut", { timeout: 4_000 });
-  await expect(eyelids).toHaveAttribute("data-eyes", "open", { timeout: 12_000 });
+  let napped = 0;
+  const napAt = async (seconds: number) => {
+    await page.clock.fastForward(Math.round((seconds - napped) * 1_000) - 100);
+    await page.clock.runFor(100);
+    napped = seconds;
+  };
+  await napAt(0.2);
+  await expect(prompt(page)).toContainText("Resting in a nap pod");
+  await expect(eyelids).toHaveAttribute("data-eyes", "open");
+  // The lids close over the view as the avatar settles, stay shut through the sleep, then open again as it wakes.
+  await napAt(2);
+  await expect(eyelids).toHaveAttribute("data-eyes", "closing");
+  await napAt(4.5);
+  await expect(eyelids).toHaveAttribute("data-eyes", "shut");
+  await napAt(7.6);
+  await expect(eyelids).toHaveAttribute("data-eyes", "opening");
+  await napAt(9.5);
+  await expect(eyelids).toHaveAttribute("data-eyes", "open");
   await expect(prompt(page)).toContainText("Rest in a nap pod");
 });

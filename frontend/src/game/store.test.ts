@@ -184,6 +184,8 @@ describe("game modes", () => {
     });
     expect(useGame.getState().switchMode("classic")).toBe(false);
     expect(useGame.getState()).toMatchObject({ mode: "campaign", game: { campaign: { step: 6 } } });
+    // Only the save stood in the way, so the player may choose to switch anyway.
+    expect(useGame.getState().canSwitchMode("classic")).toBe(true);
     expect(useGame.getState().switchMode("classic", { discard: true })).toBe(true);
     expect(useGame.getState().mode).toBe("classic");
   });
@@ -395,6 +397,11 @@ describe("challenge mode lock", () => {
     expect(useGame.getState()).toMatchObject({ mode: "campaign", game: campaign, started: true });
     expect(useGame.getState().toast?.text).toBe(LOCKED);
     expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+    // A locked mode is not a failed save: discarding the company would not open it.
+    expect(useGame.getState().canSwitchMode("classic")).toBe(false);
+    expect(useGame.getState().canSwitchMode("campaign")).toBe(true);
+    useGame.setState({ cloudBusy: true });
+    expect(useGame.getState().canSwitchMode("campaign")).toBe(false);
   });
   it("refuses a Classic import while locked, keeping both modes untouched", () => {
     enter(); const before = useGame.getState().game;
@@ -446,12 +453,40 @@ describe("exploration state", () => {
   const seed = (mode: "campaign" | "classic", state: object) =>
     localStorage.setItem(`nn.${mode}.exploration.v1`, JSON.stringify({ version: 1, avatar: null, camera: null, ...state }));
 
-  it("restores the floor at boot and walk mode on play", () => {
-    seed("campaign", { floor: "office", walking: true });
+  it("restores the floor at boot but always opens in the overview, whatever walk was left on", () => {
+    seed("campaign", { floor: "office", walking: true, viewpoint: "follow", viewChosen: true });
     useGame.getState().boot();
-    expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, started: false });
+    expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, viewpoint: "overview", started: false });
     useGame.getState().play();
-    expect(useGame.getState()).toMatchObject({ floor: "office", walking: true });
+    expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, viewpoint: "overview" });
+    // Never having chosen a view does not open following the avatar either.
+    localStorage.clear();
+    useGame.setState(useGame.getInitialState(), true);
+    enter();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("opens each mode in the overview on its own remembered floor", () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    seed("campaign", { floor: "office", walking: true, viewpoint: "first", viewChosen: true });
+    seed("classic", { floor: "servers", walking: true, viewpoint: "follow", viewChosen: true });
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", floor: "office", walking: false, viewpoint: "overview" });
+    expect(useGame.getState().switchMode("classic")).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "classic", floor: "servers", walking: false, viewpoint: "overview" });
+  });
+
+  it("returns to the overview when the title screen ends a walk and the run is entered again", () => {
+    seed("campaign", { floor: "servers", walking: false, viewChosen: true });
+    enter();
+    useGame.getState().setViewpoint("follow", "menu");
+    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "follow" });
+    useGame.getState().endSession();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(useGame.getState().measurement.pending.some((e) => e.name === "walk_ended")).toBe(true);
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
   });
 
   it("lets a ?floor= address win and stops walk mode resuming", () => {
@@ -464,50 +499,6 @@ describe("exploration state", () => {
     } finally {
       window.history.pushState({}, "", "/");
     }
-  });
-
-  it("remembers each mode's floor and walk state separately", () => {
-    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
-    seed("campaign", { floor: "office", walking: true });
-    seed("classic", { floor: "servers", walking: false });
-    useGame.getState().boot();
-    useGame.getState().play();
-    expect(useGame.getState()).toMatchObject({ mode: "campaign", floor: "office", walking: true });
-    expect(useGame.getState().switchMode("classic")).toBe(true);
-    expect(useGame.getState()).toMatchObject({ mode: "classic", floor: "servers", walking: false });
-    expect(useGame.getState().switchMode("campaign")).toBe(true);
-    expect(useGame.getState()).toMatchObject({ mode: "campaign", floor: "office", walking: true });
-  });
-
-  it("keeps the remembered walk choice when the title screen ends the walk", () => {
-    seed("campaign", { floor: "office", walking: true });
-    enter();
-    expect(useGame.getState().walking).toBe(true);
-    useGame.getState().endSession();
-    expect(useGame.getState().walking).toBe(false);
-    // The session's end still sounds, but the player's choice to walk is not unmade.
-    expect(useGame.getState().measurement.pending.some((e) => e.name === "walk_ended")).toBe(true);
-    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true });
-    useGame.getState().play();
-    expect(useGame.getState().walking).toBe(true);
-  });
-
-  it("picks the view back up with walk mode, and never without it", () => {
-    seed("campaign", { floor: "office", walking: true, viewpoint: "first" });
-    useGame.getState().boot();
-    expect(useGame.getState().viewpoint).toBe("overview");
-    useGame.getState().play();
-    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "first" });
-    useGame.getState().endSession();
-    // The title screen's stop leaves the remembered view for next time.
-    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
-    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first" });
-    localStorage.clear();
-    useGame.setState(useGame.getInitialState(), true);
-    seed("campaign", { floor: "office", walking: false, viewpoint: "follow" });
-    useGame.getState().boot();
-    useGame.getState().play();
-    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
   });
 
   it("turns walk mode on for a view from the avatar, and back to the overview when the walk ends", () => {
@@ -528,68 +519,6 @@ describe("exploration state", () => {
       expect.objectContaining({ from: "follow", to: "first", how: "menu" }),
       expect.objectContaining({ from: "first", to: "overview", how: "walk_ended" }),
     ]);
-  });
-
-  it("opens following the avatar until the player chooses how to see the room, and then as chosen", () => {
-    enter();
-    const s = () => useGame.getState();
-    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
-    // Opening there is not a choice, so nothing about it is stored.
-    expect(localStorage.getItem("nn.campaign.exploration.v1")).toBeNull();
-    s().setViewpoint("first", "key");
-    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first", viewChosen: true });
-    useGame.setState(useGame.getInitialState(), true);
-    enter();
-    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
-    s().setWalking(false);
-    useGame.setState(useGame.getInitialState(), true);
-    enter();
-    // Leaving the walk was a choice too: the overview it chose is kept.
-    expect(s()).toMatchObject({ walking: false, viewpoint: "overview" });
-  });
-
-  it("times a walk the run opens in from the opening", () => {
-    const now = vi.spyOn(performance, "now").mockReturnValue(100_000);
-    enter();
-    now.mockReturnValue(105_000);
-    useGame.getState().setWalking(false);
-    expect(useGame.getState().measurement.pending.filter((e) => e.name === "walk_ended").map((e) => e.payload)).toEqual([expect.objectContaining({ seconds: 5 })]);
-  });
-
-  it("opens in the overview for a guide or a ?floor= address, and a walk an older record chose as it was", () => {
-    // The Opening walkthrough points things out from above.
-    useGame.getState().boot();
-    useGame.getState().play();
-    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
-    useGame.setState(useGame.getInitialState(), true);
-    window.history.pushState({}, "", "/?floor=office");
-    try {
-      enter();
-      expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, viewpoint: "overview" });
-    } finally {
-      window.history.pushState({}, "", "/");
-    }
-    // Left following before there was a default: the player chose it.
-    localStorage.removeItem("nn.campaign.exploration.v1");
-    useGame.setState(useGame.getInitialState(), true);
-    seed("campaign", { floor: "servers", walking: true, viewpoint: "follow" });
-    enter();
-    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "follow" });
-  });
-
-  it("gives way to a guide from a walk it opened in, but not from one the player chose", () => {
-    enter();
-    const s = () => useGame.getState();
-    expect(s().walking).toBe(true);
-    s().startTour("scaling");
-    expect(s()).toMatchObject({ walking: false, viewpoint: "overview", tour: { track: "scaling", step: 0 } });
-    // Not remembered as left: the next run opens in first person again.
-    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1") ?? "{}").viewChosen).not.toBe(true);
-    useGame.setState(useGame.getInitialState(), true);
-    seed("campaign", { floor: "servers", walking: true, viewpoint: "first", viewChosen: true });
-    enter();
-    s().startTour("scaling");
-    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
   });
 
   it("ignores a view chosen before the run is on screen, and the same view twice", () => {

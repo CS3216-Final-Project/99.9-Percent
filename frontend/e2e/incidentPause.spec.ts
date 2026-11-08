@@ -3,12 +3,17 @@ import { test, expect, savedGame, incidentGuide } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 import { pauseTransition } from "../src/sim/__tests__/pauseFixture";
-import { bootPause, pauseArrival } from "./incidentPause";
+import { bootPause, foldedRecoveryRequirements, pauseArrival } from "./incidentPause";
 
 // Opening's native first incident already stops; its separate negative case preserves that rule.
-for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: immediate running Chapter ${chapter} transition`, async ({ page, installClock , withoutRoom}, info) => {
+for (const chapter of [2, 3, 4, 5]) test(`incident Pause: immediate running Chapter ${chapter} transition`, async ({ page, installClock , withoutRoom}, info) => {
   await withoutRoom();
   await installClock(); await pauseArrival(page, info, chapter);
+});
+
+for (const chapter of [3, 5]) test(`incident recovery: Chapter ${chapter} folds the recovery requirements into a drop-down`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
+  await installClock(); await foldedRecoveryRequirements(page, info, chapter);
 });
 
 test("incident Pause: preserves the first-incident stop and paused-save resume", async ({ page, installClock , withoutRoom}) => {
@@ -79,7 +84,7 @@ test("incident Pause: deliberate continued-running activity dismisses once, not 
 });
 
 // A real captured mouse is the normal first-person play path, not a blocking dialog.
-for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
+for (const chapter of [2, 3, 4, 5]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
   // First person loads the room twice over and Chapter 3 also waits out the hint delay: about a minute on CI.
   test.setTimeout(120_000);
   await installClock(); const pair = pauseTransition(chapter); await bootPause(page, pair.before);

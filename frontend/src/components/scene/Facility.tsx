@@ -23,7 +23,9 @@ import { loadExploration, saveExploration, type SavedCameraView } from "@/game/e
 import { canInspectEquipment, inspectInRoom, isSheetView, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
+import { OPENING_TRAFFIC_NOTE, openingTrafficCue, startsOpeningTraffic } from "@/game/openingTrafficCue";
 import { isPhoneEdition } from "@/phone/edition";
+import { useCountUp } from "../useCountUp";
 import {
   AISLE_Z,
   appSlot,
@@ -44,6 +46,7 @@ import { tipProps } from "../tips";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
+import { useMediaQuery } from "../useMediaQuery";
 import { ActivityEffects } from "./activities";
 import { ArcadePanel } from "./ArcadePanel";
 import { serveArcade } from "./arcade";
@@ -79,13 +82,14 @@ import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow 
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
-import { screenPoint, stackDown, stackUnder } from "./labels";
+import { LABEL_GAP, LABEL_TAIL, screenPoint, separate, stackDown, stackUnder, zoomScale } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 import { trafficModel } from "./traffic";
 import { CampaignTraffic, Gate } from "./TrafficFlow";
 import { Ghosts } from "./Ghosts";
 import { rackLit } from "./spotSpec";
 import { SpotBeams } from "./SpotBeams";
+import { autoscaleSpot } from "@/game/autoscaleSpotlight";
 import { changeOf } from "./ghostSpec";
 import { IN_GATE, OUT_GATE } from "./trafficLayout";
 import { PathGlow } from "./SpotBeams";
@@ -346,6 +350,17 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
         focusing.current = s.cameraFocus.anchor;
         touched.current = true;
         homing.current = false;
+      }),
+    [],
+  );
+
+  // The Opening's first Run looks at the In gate, where the customers' requests are about to climb.
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (s.generation !== prev.generation || !startsOpeningTraffic(prev.game.campaign, s.game.campaign)) return;
+        if (s.floor !== "servers") s.goToFloor("servers", "tour");
+        s.focusCamera(TRAFFIC_IN);
       }),
     [],
   );
@@ -816,6 +831,8 @@ const TRAFFIC_OUT = "traffic-out";
 const labelAt = new THREE.Vector2();
 /** Where each label goes this frame, and how large, kept until overlapping ones are moved apart. */
 const placed = new Map<string, { x: number; y: number; scale: number }>();
+/** The shown labels, in the order they claim their places when moved apart. */
+const separating: string[] = [];
 /** Labels behind a view from the avatar, hidden this frame. */
 const behind = new Set<string>();
 const inView = new THREE.Vector3();
@@ -877,24 +894,29 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
   const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
+  // The overview shrinks every label alike as it zooms out, keeping the shortest button a comfortable target.
+  // Sizes below are read from layout, which a transform leaves alone, so they are scaled to match what is drawn.
+  let shortest = Infinity;
+  if (!deep) labelEls.forEach((el) => { if (el instanceof HTMLButtonElement && el.offsetHeight) shortest = Math.min(shortest, el.offsetHeight); });
+  const fit = deep ? 1 : zoomScale((camera as THREE.OrthographicCamera).zoom, shortest === Infinity ? 0 : shortest);
   // Pack the app labels from their true spots and sizes, not a fixed pitch: routed ones carry a load bar and a
   // status note that make them taller than a constant assumes, and machines spread across the floor already keep
   // some marks apart, so a label drops only below the ones it really overlaps.
   const appSpots = campaignAppIds.map((id) => {
     const el = labelEls.get(id);
     const pos = anchors.get(id);
-    const h = el?.offsetHeight ?? 0;
+    const h = (el?.offsetHeight ?? 0) * fit;
     // Behind a view from the avatar an anchor can project mirrored, so those views keep a plain stack.
     if (deep || !pos) return { x: 0, y: 0, w: 1, h };
     screenPoint(pos, camera, size.width, size.height, labelAt);
-    return { x: labelAt.x, y: labelAt.y, w: el?.offsetWidth ?? 0, h };
+    return { x: labelAt.x, y: labelAt.y, w: (el?.offsetWidth ?? 0) * fit, h };
   });
-  const appBottoms = stackDown(appSpots, -10);
+  const appBottoms = stackDown(appSpots, -10 * fit);
   const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appSpots.map((s) => s.h), size.height * 0.4) : null;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
-    let scale = 1;
+    let scale = fit;
     if (deep) {
       // In perspective a point behind the camera projects to a mirrored place on screen, so its label is hidden.
       camera.updateMatrixWorld();
@@ -908,11 +930,11 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
-    if (labelEls.has("app-1") && key === "app") y -= 100;
-    else if (labelEls.has("app-1") && key === "gateway") y -= 30;
+    if (labelEls.has("app-1") && key === "app") y -= 100 * fit;
+    else if (labelEls.has("app-1") && key === "gateway") y -= 30 * fit;
     else if (slot >= 0) y = appBottoms[slot];
     // The In gate stands just west of the gateway: lift its count clear of the Network label.
-    if (key === TRAFFIC_IN) y -= 38;
+    if (key === TRAFFIC_IN) y -= 38 * fit;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
     // growing pool above it by slot order, even when permanent IDs have gaps.
     if (appCeilings && slot >= 0) {
@@ -928,9 +950,21 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
   // The Read Cache stands beside the database, so from some views their markers meet: stack the cache's above.
   const cache = placed.get("cache"), db = placed.get("db"), cacheEl = labelEls.get("cache"), dbEl = labelEls.get("db");
   if (cache && db && cacheEl && dbEl) {
-    const h = Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12;
-    if (Math.abs(cache.x - db.x) < (cacheEl.offsetWidth + dbEl.offsetWidth) / 2 && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
+    const h = (Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12) * fit;
+    if (Math.abs(cache.x - db.x) < ((cacheEl.offsetWidth + dbEl.offsetWidth) / 2) * fit && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
   }
+  // Whatever still overlaps - neighbouring machines whose anchors sit closer than their labels are wide - is lifted
+  // apart, never lowered, so no label sinks under a panel or below its machine; hidden empty bays take no room.
+  // A label's own top margin (offsetTop, as it sits at the layer's top) lifts its box off the placed point.
+  separating.length = 0;
+  placed.forEach((_, key) => {
+    if (!labelEls.get(key)!.classList.contains("is-quiet")) separating.push(key);
+  });
+  const clear = separate(separating.map((key) => {
+    const p = placed.get(key)!, el = labelEls.get(key)!;
+    return { x: p.x, y: p.y + el.offsetTop, w: el.offsetWidth * p.scale, h: el.offsetHeight * p.scale };
+  }), (LABEL_TAIL + LABEL_GAP) * fit, 0);
+  separating.forEach((key, i) => { placed.get(key)!.y = clear[i] - labelEls.get(key)!.offsetTop; });
   placed.forEach(({ x, y, scale }, key) => {
     const el = labelEls.get(key)!;
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)${scale < 1 ? ` scale(${scale.toFixed(3)})` : ""}`;
@@ -1017,17 +1051,23 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   );
 }
 
-/** In and Out, with this second's requests: the gap between the two is what the company is losing. */
+/**
+ * In and Out, with this second's requests: the gap between the two is what the company is losing. The figures count
+ * to each new second's together, so the gap stays true while they move; the accessible names give the settled ones.
+ */
 export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
+  const cue = openingTrafficCue(c);
+  const admitted = useCountUp(m.admitted), rejected = useCountUp(m.rejected), successful = useCountUp(m.successful);
   return (
     <>
-      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
-        <b>In</b> {num(m.admitted)}/s
-        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}${cue ? " is-cued" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}${cue ? `. ${OPENING_TRAFFIC_NOTE[cue]}` : ""}`}>
+        <b>In</b> {num(admitted)}/s
+        {cue && <span className="gate-cue" aria-hidden>{OPENING_TRAFFIC_NOTE[cue]}</span>}
+        {rejected > 0 && <span className="gate-note">{num(rejected)}/s turned away - no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
-        <b>Out</b> {num(m.successful)}/s
+        <b>Out</b> {num(successful)}/s
       </span>
     </>
   );
@@ -1045,6 +1085,7 @@ function Labels({ landed }: { landed: Floor | null }) {
   const selected=useGame(s=>s.selected);
   const appsAffected=useGame(s=>s.affected.includes("app"));
   const trafficView=useGame(trafficViewOn);
+  const autoscaling=useMemo(()=>autoscaleSpot(c)?.appId??null,[c]);
   const servers = landed === "servers";
   return (
     <div className="eq-labels">
@@ -1058,7 +1099,7 @@ function Labels({ landed }: { landed: Floor | null }) {
       {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (!trafficView || ["gateway", "app", "db", "cache"].includes(id)) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={serverName(a.id)} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{serverName(a.id)}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}${autoscaling===a.id?" is-autoscaling":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={serverName(a.id)} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{serverName(a.id)}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
     </div>
   );
 }
@@ -1867,6 +1908,8 @@ function FloorMenu() {
 /** Renderer actions stay with the scene; only their DOM is placed in the shared dock. */
 function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
   const floor = useGame(s => s.floor);
+  // At phone width the menu shows its "Navigation" name, so it needs no tip.
+  const narrowDock = useMediaQuery("(max-width: 640px)");
   const walking = useGame(s => s.walking);
   const model = useSceneModel();
   const other = floor === "servers" ? "office" : "servers";
@@ -1874,13 +1917,13 @@ function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) 
   const host = useRoomControlsHost();
   if (!host) return null;
   return createPortal(<>
-    <DockMenu className="room-menu" label={<><Icon name="floor" size={20} /><span className="desktop-room-name">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
+    <DockMenu className="room-menu" tip={narrowDock ? undefined : "Floor"} label={<><Icon name="floor" size={20} /><span className="desktop-room-name visually-hidden">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
       <h3>Choose a floor</h3>
       <FloorMenu />
       <div className="mobile-room-tools"><h3>View mode</h3><ViewModeOptions stage={stage} /><h3>Camera</h3><CameraTools /></div>
     </DockMenu>
-    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} label={<><Icon name="explore" size={20} /><span>View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
-    <DockMenu className="camera-menu" label={<><Icon name="camera" size={20} /><span>Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
+    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} tip="View mode" label={<><Icon name="explore" size={20} /><span className="visually-hidden">View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
+    <DockMenu className="camera-menu" tip="Camera" label={<><Icon name="camera" size={20} /><span className="visually-hidden">Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
   </>, host);
 }
 

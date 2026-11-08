@@ -43,8 +43,8 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await clockTo(page,n+13);let c=(await savedGame(page)).campaign!;expect(c.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(c.snapshot.app.capacity).toBe(3200);
  // Paint the new room label while the company stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
- const app3Reveal=page.getByRole("dialog",{name:"App Servers"});await expect(app3Reveal).toBeVisible();await app3Reveal.getByRole("button",{name:"Close"}).click();
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.locator(".component-inspection-app")).toContainText("Not receiving traffic");
+ const app3Reveal=page.locator(".component-inspection-app");await expect(app3Reveal).toBeVisible();await app3Reveal.getByRole("button",{name:"Close"}).click();
  await page.screenshot({path:"test-results/phase5-desktop.png",fullPage:true});
  c=(await savedGame(page)).campaign!;
  // Room selection is verified above; the remaining journey exercises clock and replay UI.
@@ -56,8 +56,8 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await expect(page.getByRole("dialog")).toContainText("provisioning and routing");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await clockTo(page,n+40);c=(await savedGame(page)).campaign!;expect(c.apps.some(a=>a.id==="app-4")).toBe(false);expect(c.trace.some(t=>t.type==="autoscale-instance-retired")).toBe(true);
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Incident postmortem");await page.getByRole("button",{name:"Continue company",exact:true}).click();
- await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike response handled");
- await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike response handled"})).toBeVisible();
+ await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike test passed");
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike test passed"})).toBeVisible();
  await page.getByRole("button",{name:"Stay in this chapter",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 test("spikes: manual planning installs, scales and routes capacity through room controls",async({page, installClock})=>{
@@ -68,7 +68,7 @@ test("spikes: manual planning installs, scales and routes capacity through room 
  await (await infrastructureAction(page,/Add server/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2,resumeClock:false});
  // Render the installed rack while physical game time stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up Server 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();const scaleReveal=page.locator(".component-inspection-app");await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up Server 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
  await routeAllApps(page,undefined,()=>advanceCampaignStep(page,{resumeClock:false}));
  const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
  expect(c.step).toBe(n+6);
@@ -116,8 +116,8 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  await (await infrastructureAction(page,"Disable autoscaling")).click();
  await closeInspection(page);await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
- await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
- const idleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Close"}).click();
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.locator(".component-inspection-app")).toContainText("Not receiving traffic");
+ const idleReveal=page.locator(".component-inspection-app");await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Close"}).click();
  await routeAllApps(page,undefined,async()=>{await runTo(page,(await savedGame(page)).campaign!.step+1)});
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

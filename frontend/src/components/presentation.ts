@@ -1,4 +1,5 @@
-import type { EquipmentId, EquipmentState, EventKind, Postmortem, TechId } from "@/sim";
+import { BALANCE, userGoal, type EquipmentId, type EquipmentState, type EventKind, type GameState, type Postmortem, type TechId } from "@/sim";
+import { num } from "@/game/format";
 import type { IconName } from "./icons";
 import type { ConceptKind } from "./ui";
 
@@ -77,6 +78,25 @@ export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
 
 export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
   return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
+}
+
+/** Challenge Mode's Users tooltip: the goal and its deadline, or past the Series A the next milestone with none. */
+export function usersGoalTip(game: GameState): string {
+  const goal = userGoal(game);
+  const text = game.seriesAWeek === undefined
+    ? `Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}.`
+    : goal === null
+      ? `Series A secured in week ${game.seriesAWeek}, and every milestone passed. There is no deadline; keep growing.`
+      : `Series A secured in week ${game.seriesAWeek}. Next goal: ${num(goal)} users, with no deadline.`;
+  return `${text} Every user adds traffic.`;
+}
+
+/** A round upper bound for a chart axis: 1, 2 or 5 times a power of ten. */
+export function niceMax(v: number): number {
+  if (v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
 }
 
 /** Series colours, shared by both modes' history charts. */

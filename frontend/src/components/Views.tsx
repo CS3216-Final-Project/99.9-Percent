@@ -6,7 +6,7 @@ import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
-import { CHART_COLORS, EVENT_STYLE, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
+import { CHART_COLORS, EVENT_STYLE, niceMax, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, Tabs } from "./ui";
 
 /* ------------------------------------------------------------------ */
@@ -111,12 +111,6 @@ interface Series {
   values: number[];
 }
 
-function niceMax(v: number): number {
-  if (v <= 0) return 1;
-  const pow = Math.pow(10, Math.floor(Math.log10(v)));
-  const n = v / pow;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
-}
 
 export function LineChart({
   title,
@@ -141,17 +135,18 @@ export function LineChart({
 }) {
   const W = 340;
   const H = 170;
-  const L = 44;
   const R = 12;
   const T = 10;
   const B = 22;
   const all = series.flatMap((s) => s.values);
   const lo = min ?? Math.min(0, ...all);
   const hi = max ?? niceMax(Math.max(target ?? 0, ...all, 1));
+  const ticks = [lo, lo + (hi - lo) / 2, hi];
+  // The left margin fits the longest tick label ("1,000 ms"), which a fixed margin cut off at the chart's edge.
+  const L = Math.max(44, Math.ceil(Math.max(...ticks.map((t) => format(t).length)) * 6.8) + 10);
   const n = Math.max(1, turns.length - 1);
   const x = (i: number) => L + ((W - L - R) * i) / n;
   const y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (hi - lo || 1));
-  const ticks = [lo, lo + (hi - lo) / 2, hi];
   const hit = Math.max(3, Math.min(8, (W - L - R) / n / 2));
 
   return (
@@ -219,7 +214,7 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
   const monitored = game.techDone.includes("monitoring");
   return (
     <div className="charts">
-      <LineChart title="Users" series={[{ name: "Users", color: CHART_COLORS.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
+      <LineChart title="Users" series={[{ name: "Users", color: CHART_COLORS.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel={game.seriesAWeek === undefined ? "Goal" : "Series A"} />
       <LineChart title="Cash" series={[{ name: "Cash", color: CHART_COLORS.cash, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
       {!compactSet && (
         <>

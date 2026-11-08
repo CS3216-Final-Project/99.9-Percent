@@ -9,6 +9,7 @@ import { chapterEnd } from "./chapterCompletion";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
+import { draftAction, draftRefusal, toggleDraft, type RoutingDraft } from "./routingDraft";
 import type { Campaign } from "@/sim/campaignTypes";
 
 import { create } from "zustand";
@@ -20,12 +21,16 @@ import {
   incidentTick,
   inspectable,
   newGame,
+  needsAppProfile,
   newLegacyGame,
+  USER_MILESTONES,
+  userGoal,
   type Action,
   type EquipmentId,
   type GameState,
   type TechId,
 } from "@/sim";
+import { num } from "./format";
 import {
   clearSave,
   decodeClassicSave,
@@ -91,13 +96,16 @@ export type Speed = 0.5 | 1 | 2;
  * Challenge Mode's first-week walkthrough ("basics") and first-incident guide ("incident"); Guided Mode's Opening
  * walkthrough ("campaign") and the short guide for each later chapter, named after it.
  */
-/** A one-card Guided Mode tip shown the first time something happens; see Meta.tipsSeen. */
-export type TipTour = GuidedTip;
+/**
+ * A one-card Guided Mode tip shown the first time something happens; see Meta.tipsSeen. The Hint tip is not a card:
+ * it labels the Hint button's idle glow until the player first opens Hint (CampaignAttention.tsx).
+ */
+export type TipTour = Exclude<GuidedTip, "hint">;
 export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTour;
 
 /** The chapter a Guided Mode company has entered, if it is past the Opening. */
 function chapterTourOf(c: Campaign): ChapterTour | null {
-  return c.combinedStage ? "combined" : c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
+  return c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
 }
 
 export interface Tour {
@@ -148,6 +156,10 @@ export interface Toast {
   id: number;
   text: string;
   kind: "info" | "error" | "success";
+  /** A milestone reads as one rather than as a finished action. */
+  milestone?: boolean;
+  /** It says the company could not be saved, which a dialog warning that the company is not saved already says. */
+  unsaved?: boolean;
 }
 
 /** The player's latest decision and whether the game accepted it. */
@@ -244,6 +256,12 @@ interface Store {
   selectApp: (id: string) => void;
   /** Ephemeral room or Campaign shortcut inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
+  /**
+   * Routing picked in an open inspection but not yet sent: the window would close on the first pending change, so the
+   * picks collect here and become one routing change when the window closes, however it closes. Never saved.
+   */
+  routingDraft: RoutingDraft | null;
+  toggleRoutingDraft: (appId: string) => void;
   dismissRoomInspection: () => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
@@ -335,6 +353,11 @@ interface Store {
    * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
    */
   switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
+  /**
+   * Whether nothing but saving stands in the way of switching to `mode`: no cloud action is in progress and the mode
+   * is unlocked. After a refused switch it tells a failed save, which may be overridden, from the other refusals.
+   */
+  canSwitchMode: (mode: GameMode) => boolean;
   saveNow: (quiet?: boolean) => boolean;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
@@ -347,6 +370,8 @@ interface Store {
   tourNext: () => void;
   tourBack: () => void;
   endTour: (completed: boolean) => void;
+  /** Remember that a one-time Guided Mode tip has done its job, so it does not show again in this browser. */
+  seeTip: (tip: GuidedTip) => void;
   dismissChapterComplete: () => void;
   /**
    * Answer the end of the chapter the company has just finished (see game/chapterCompletion.ts): stay in it, or
@@ -362,7 +387,7 @@ interface Store {
   toggleMute: () => void;
   /** Change the graphics settings, remembered for next time. An unknown quality is ignored; the field of view is kept in range. */
   setGraphics: (patch: Partial<GraphicsSettings>) => void;
-  notify: (text: string, kind?: Toast["kind"]) => void;
+  notify: (text: string, kind?: Toast["kind"], about?: Pick<Toast, "unsaved">) => void;
   dismissToast: () => void;
 }
 
@@ -378,11 +403,11 @@ const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
   "prevention-review": "acknowledge_prevention_review",
   "spike-acknowledgement": "acknowledge_spikes",
+  "spike-debrief": "acknowledge_spike_attempt",
 } as const;
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(g: GameState): Action["type"] | null {
   const c = g.campaign!, stop = pendingStop(c);
-  if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
   return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
@@ -393,6 +418,14 @@ const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknow
 export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
   const c = s.game.campaign;
   return !!c && !!s.meta.trafficView;
+}
+
+/**
+ * Whether a Challenge Mode company is waiting for the player to say what it builds: right after the first-week tutorial,
+ * or at once for a player who has done it or skipped it. Weeks do not move on meanwhile.
+ */
+export function choosingAppProfile(s: Pick<Store, "game" | "tour" | "started" | "onboarding">): boolean {
+  return s.started && !s.onboarding && s.tour?.track !== "basics" && s.game.phase === "management" && needsAppProfile(s.game);
 }
 
 /** Whether the room holds still: whenever Guided Mode's clock is paused, and while Challenge Mode's incident clock is. */
@@ -446,7 +479,7 @@ export const useGame = create<Store>()((set, get) => {
       set({measurement:{...s.measurement,pending:[]}});
       return finish(true);
     }
-    s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error");
+    s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error",{unsaved:true});
     return finish(false);
   }
   function uiEvent(name:string,data:Record<string,string|number|boolean|null>={}) {
@@ -495,28 +528,10 @@ export const useGame = create<Store>()((set, get) => {
     return { floor };
   }
   /**
-   * How the room is seen as the title screen gives way to a mode's run on `floor`. A `?floor=` address shows that
-   * floor from above. A player who has never chosen how to see the room starts in third person, unless a guide is
-   * about to point things out, which it does from above. Otherwise walk mode comes back as the last visit left it,
-   * with its view, when it was on this floor.
+   * How the room is seen as the title screen gives way to a run: always from above, with walk mode off. Follow and
+   * first person are the player's to choose once the run is on screen; opening the game never lands in them.
    */
-  function openingView(mode: GameMode, floor: Floor, guided: boolean): { walking: boolean; viewpoint: Viewpoint } {
-    const overview = { walking: false, viewpoint: "overview" as const };
-    if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return overview;
-    const exploration = loadExploration(mode);
-    // A phone opens from above, where its layout is made to be read, and has no first person to come back to.
-    const phone = isPhoneEdition();
-    const opened = !exploration.viewChosen
-      ? (guided || phone ? overview : { walking: true, viewpoint: "follow" as const })
-      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: offeredViewpoint(exploration.viewpoint, phone) } : overview;
-    // The walk is timed from here, like one the player starts.
-    if (opened.walking) walkStart = performance.now();
-    return opened;
-  }
-  /** Guides point at the room from above: a walk the player never chose gives way to one, and is not remembered as left. */
-  function makeWayForGuide(): void {
-    if (get().walking && !loadExploration(get().mode).viewChosen) get().setWalking(false, false);
-  }
+  const openingView = () => ({ walking: false, viewpoint: "overview" as const });
   /** An event for the analytics, wherever this mode keeps them. */
   function record(name: "view_changed" | "map_toggled" | "map_walked", data: Record<string, string | number | boolean>) {
     if (get().game.campaign) uiEvent(name, data);
@@ -566,18 +581,15 @@ export const useGame = create<Store>()((set, get) => {
         if(open) patch.tour=null;
         const seen=(patch.meta??get().meta).chapterTours;
         if(!seen.includes(chapter)) {
-          makeWayForGuide();
           const meta={...(patch.meta??get().meta),chapterTours:[...seen,chapter]};
           saveMeta(meta);
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
       }
-      // Completing the introduction spotlights the Hint button once: it keeps helping in later chapters.
       // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
-      const tip:GuidedTip|null=!was?.completedIntroduction?.completed&&c.completedIntroduction?.completed&&!tips.includes("hint")?"hint"
-        :c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
+      const tip:TipTour|null=c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
       if(was?.runId===c.runId&&tip&&!chapterTourOf(c)&&!get().tutorialCompany
         &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
         const meta={...(patch.meta??get().meta),tipsSeen:[...tips,tip]};
@@ -636,7 +648,9 @@ export const useGame = create<Store>()((set, get) => {
 
     if (!prev.outcome && next.outcome) {
       const report = buildReport(next);
-      track("run_finished", {
+      // A run finishes once, at its Series A; playing on afterwards ends separately.
+      const endless = next.seriesAWeek !== undefined;
+      track(endless ? "endless_finished" : "run_finished", {
         outcome: report.outcome,
         weeks: report.weeks,
         users: report.users,
@@ -645,8 +659,20 @@ export const useGame = create<Store>()((set, get) => {
         incidents: report.incidents.total,
         seed: next.seed,
       });
-      meta = { ...meta, runsFinished: meta.runsFinished + 1 };
+      if (!endless) meta = { ...meta, runsFinished: meta.runsFinished + 1 };
       patch.running = false;
+    }
+
+    if (prev.seriesAWeek === undefined && next.seriesAWeek !== undefined) {
+      track("endless_started", { week: next.seriesAWeek, users: Math.round(next.users), seed: next.seed });
+    }
+
+    // Past the Series A, each user milestone the company passes moves the Users goal on; say so once.
+    const goal = userGoal(next);
+    if (prev.seriesAWeek !== undefined && goal !== userGoal(prev)) {
+      const reached = USER_MILESTONES.findLast((m) => m <= next.totals.peakUsers) ?? BALANCE.targetUsers;
+      patch.toast = { id: toastId++, kind: "success", milestone: true,
+        text: goal === null ? `${num(reached)} users reached. Every milestone passed: keep growing.` : `${num(reached)} users reached. Next goal: ${num(goal)}.` };
     }
 
     if (next.phase === "ended") {
@@ -691,6 +717,7 @@ export const useGame = create<Store>()((set, get) => {
       selected: null,
       selectedAppId: null,
       roomInspection: null,
+      routingDraft: null,
       hovered: null,
       affected: [], previewAction: null, spotlight: [],
       cameraFocus: null,
@@ -709,7 +736,7 @@ export const useGame = create<Store>()((set, get) => {
         track("save_resumed", { mode, week: loaded.game.turn, phase: loaded.game.phase });
         const tour: Tour | null = !meta.tutorialDone && isFreshRun(loaded.game) ? { track: "basics", step: 0 } : null;
         // A run resumed mid-incident starts paused so nothing burns while the player reorients.
-        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView() : {}) });
         if (tour) recordTour("started", tour, { from: "resume" });
         return;
       }
@@ -720,7 +747,7 @@ export const useGame = create<Store>()((set, get) => {
       track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       const tour: Tour | null = meta.tutorialDone ? null : { track: "basics", step: 0 };
       // Switching into an empty classic mode starts a company; boot, which only shows the title, does not.
-      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView() : {}) });
       if (tour) recordTour("started", tour, { from: "first_visit" });
       if (!saved) get().notify("Could not save. Play continues in memory.", "error");
       else if (loaded.status === "corrupt") get().notify("Saved Challenge Mode run was unreadable. Started a new one.", "error");
@@ -871,6 +898,8 @@ export const useGame = create<Store>()((set, get) => {
     setPanelOpen: open => set({panelOpen: open}),
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
+    routingDraft: null,
+    toggleRoutingDraft: appId => { const c=get().game.campaign; if(c) set({routingDraft:toggleDraft(c,get().routingDraft,appId)}); },
     dismissRoomInspection: () => {
       const inspection=get().roomInspection;
       // Only acknowledging a popup actually opened by the player can complete a component step.
@@ -880,6 +909,7 @@ export const useGame = create<Store>()((set, get) => {
           get().act({type:"acknowledge_introduction",equipment:inspection.equipment});
       }
       set({roomInspection:null});
+      sendRoutingDraft();
     },
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
@@ -985,7 +1015,7 @@ export const useGame = create<Store>()((set, get) => {
     play: () => {
       if(get().started)return;
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
-      if(get().mode === "classic") { set({started:true,...openingView("classic",get().floor,!!get().tour),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
+      if(get().mode === "classic") { set({started:true,...openingView(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
@@ -994,7 +1024,7 @@ export const useGame = create<Store>()((set, get) => {
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
-      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView("campaign",state.floor,!state.hasRun && !meta.tutorialDone),
+      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView(),
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         tour:null,activeMark:document.hidden?null:performance.now()});
@@ -1031,6 +1061,7 @@ export const useGame = create<Store>()((set, get) => {
     act: (action) => {
       // Version new completions while preserving historical replay inputs.
       if(action.type==="complete_introduction")action={...action,handoff:"opening"};
+      if(action.type==="enter_spikes")action={...action,version:2};
       const game = get().game, c = game.campaign;
       const acknowledgement = c && requiredAcknowledgement(game);
       // Launch Week's research pick still comes before its milestone, which waits for it.
@@ -1043,7 +1074,7 @@ export const useGame = create<Store>()((set, get) => {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
         const wasRunning = get().running;
-        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
+        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
@@ -1068,10 +1099,13 @@ export const useGame = create<Store>()((set, get) => {
     advance: () => {
       const { game } = get();
       if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
+      if (choosingAppProfile(get())) return;
       const next = advanceTurn(game);
+      const toast = get().toast;
       commit(next);
       const r = next.lastReport;
-      if (next.phase === "management" && r && r.turn === game.turn) {
+      // A milestone announced by this week outranks its routine summary.
+      if (next.phase === "management" && r && r.turn === game.turn && get().toast === toast) {
         const gained = r.usersAfter - r.usersBefore;
         get().notify(
           `Week ${r.turn}: ${gained >= 0 ? "+" : ""}${Math.round(gained).toLocaleString("en-US")} users, ${r.net >= 0 ? "+" : "-"}$${Math.abs(Math.round(r.net)).toLocaleString("en-US")}`,
@@ -1151,7 +1185,7 @@ export const useGame = create<Store>()((set, get) => {
     },
     setRunning: (running) => {
       set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { deployRush: false }) });
-      if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
+      if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error", { unsaved: true });
     },
     setSpeed: (speed) => set({ speed, deployRush: false }),
     rushDeploy: () => { get().setRunning(true); if (get().running) set({ deployRush: true }); },
@@ -1234,11 +1268,12 @@ export const useGame = create<Store>()((set, get) => {
       enter(mode, true);
       return true;
     },
+    canSwitchMode: (mode) => !get().cloudBusy && (mode !== "classic" || challengeUnlockedNow()),
 
     saveNow: (quiet = false) => {
       if(get().game.campaign) get().measureTime();
       const saved=persist();
-      if(!quiet || !saved) get().notify(saved ? "Saved" : "Could not save: browser storage is unavailable.", saved ? "success" : "error");
+      if(!quiet || !saved) get().notify(saved ? "Saved" : "Could not save: browser storage is unavailable.", saved ? "success" : "error", saved ? {} : { unsaved: true });
       return saved;
     },
 
@@ -1313,13 +1348,12 @@ export const useGame = create<Store>()((set, get) => {
         const meta = practiceAt(s.meta, true);
         set({ game, measurement, tutorialCompany: company, meta, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
           tour: null, view: null, started: true, running: false, deployRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
-          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
+          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null, routingDraft: null,
           affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
         persist();
         return;
       }
       if (track_ === "campaign") return;
-      makeWayForGuide();
       const campaign = !!get().game.campaign;
       const tour: Tour = { track: track_, step: 0 };
       const begins = get().tour?.track !== track_;
@@ -1346,6 +1380,13 @@ export const useGame = create<Store>()((set, get) => {
       const tour = get().tour;
       if (tour) set({ tour: { ...tour, step: Math.max(0, tour.step - 1) } });
     },
+    seeTip: (tip) => {
+      const meta = get().meta, seen = meta.tipsSeen ?? [];
+      if (seen.includes(tip)) return;
+      const next = { ...meta, tipsSeen: [...seen, tip] };
+      if (!saveMeta(next, get().mode)) get().notify("Onboarding preferences could not be saved.", "error");
+      set({ meta: next });
+    },
     dismissChapterComplete: () => set({ chapterComplete: null }),
     finishChapter: (choice) => {
       const end = chapterEnd(get().game, get().scope);
@@ -1370,7 +1411,7 @@ export const useGame = create<Store>()((set, get) => {
       if (company) {
         persist(); clearTutorialPractice();
         set({ ...company, tutorialCompany: null, meta: practiceAt(meta, false), generation: get().generation + 1, selected: null, selectedAppId: null,
-          roomInspection: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
+          roomInspection: null, routingDraft: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
           tour: null, running: false, deployRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
         return;
       }
@@ -1436,7 +1477,7 @@ export const useGame = create<Store>()((set, get) => {
       set({ rating });
     },
 
-    notify: (text, kind = "info") => set({ toast: { id: toastId++, text, kind } }),
+    notify: (text, kind = "info", about = {}) => set({ toast: { id: toastId++, text, kind, ...about } }),
     dismissToast: () => set({ toast: null }),
   };
 });
@@ -1503,12 +1544,29 @@ let roomInspectionSeq = 0;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
+  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  // Leaving the Network window for another inspection sends its picks, as closing it would.
+  sendRoutingDraft();
   const { game, panelOpen } = useGame.getState();
-  if (!canInspectEquipment(game, id)) return;
   inspectOrSelect(id, appId);
   // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
   // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
-  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, routingDraft: null, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+}
+
+/**
+ * Sends the routing picked in a Network window as one change and clears the picks. The window may have closed because
+ * something else needed the player, so a change the engine would now refuse is never sent: the player is told the
+ * picks were dropped instead of seeing a rejection or losing them unnoticed.
+ */
+function sendRoutingDraft(): void {
+  const { game, routingDraft, act, notify } = useGame.getState(), c = game.campaign;
+  if (!routingDraft) return;
+  useGame.setState({ routingDraft: null });
+  const action = c && draftAction(c, routingDraft);
+  if (!action) return;
+  const refusal = draftRefusal(game, action);
+  if (refusal || !act(action)) notify(refusal ?? "The Network window closed before your traffic picks could be sent.", "info");
 }
 
 /** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */

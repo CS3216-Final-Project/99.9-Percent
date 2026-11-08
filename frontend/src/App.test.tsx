@@ -7,14 +7,14 @@ import { DEFAULT_META, saveMeta, saveGame } from "./game/persist";
 import { newGame } from "./sim";
 vi.mock("./components/scene/Facility", () => ({ default: () => <div data-testid="facility" /> }));
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 it("lets new players compare both modes without starting a run for them", () => {
   vi.useFakeTimers();
   render(<StrictMode><App /></StrictMode>);
   const choices = screen.getByRole("region", { name: "Choose how you want to play" });
   const guided = within(choices).getByRole("region", { name: "Guided Mode" });
   const challenge = within(choices).getByRole("region", { name: "Challenge Mode" });
-  expect(guided.textContent).toContain("six infrastructure chapters");
+  expect(guided.textContent).toContain("five infrastructure chapters");
   expect(challenge.textContent).toContain("50,000 users in 26 weeks");
   expect(within(choices).getByRole("button", { name: "Start Guided Mode" })).toBeTruthy();
   // Challenge Mode is locked until Chapter 5 is complete, and its teaser has nothing to press.
@@ -49,9 +49,42 @@ it("keeps the mode choice open when switching cannot preserve the stored save", 
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Start Challenge Mode" }));
   expect(useGame.getState().started).toBe(false);
-  expect(screen.getByRole("button", { name: "Switch and lose this run" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Switch and lose this company" })).toBeTruthy();
   expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
   expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+});
+
+it("withdraws the menu's lose-this-company warning once Save now succeeds, and then saves before switching", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  const menu = openMenu();
+  const modes = within(menu).getByRole("region", { name: "Game mode" });
+  const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
+  expect(within(modes).getByRole("alert").textContent).toContain("This company could not be saved");
+  // Storage recovers and the player saves from the same menu: the run is safe again.
+  setItem.mockRestore();
+  fireEvent.click(within(menu).getByRole("button", { name: /Save now/ }));
+  expect(useGame.getState().saveStatus).toBe("saved");
+  expect(within(modes).queryByRole("alert")).toBeNull();
+  localStorage.removeItem("nn.campaign.save.v1");
+  fireEvent.click(within(modes).getByRole("button", { name: "Switch to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(localStorage.getItem("nn.campaign.save.v1")).not.toBeNull();
+});
+
+// Guided Mode keeps a company and Challenge Mode a run, as their New company and New game confirmations say.
+it.each([
+  { from: "Guided Mode", start: "Start Guided Mode", to: "Challenge Mode", lost: "company" },
+  { from: "Challenge Mode", start: "Start Challenge Mode", to: "Guided Mode", lost: "run" },
+])("names the $lost a failed save would lose when switching away from $from", ({ start, to, lost }) => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: start }));
+  const modes = within(openMenu()).getByRole("region", { name: "Game mode" });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+  fireEvent.click(within(modes).getByRole("button", { name: `Switch to ${to}` }));
+  expect(within(modes).getByRole("alert").textContent).toBe(`This ${lost} could not be saved, so switching now loses it. Press "Switch and lose this ${lost}" again to switch anyway.`);
+  expect(within(modes).getByRole("button", { name: `Switch and lose this ${lost}` })).toBeTruthy();
 });
 
 it("shows the locked unlock prompt in the menu instead of a switch control", () => {
@@ -121,7 +154,7 @@ describe("opening UI", () => {
     expect(useGame.getState().running).toBe(false);
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByRole("heading", { name: "Recovery progress" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Guided Mode requirements" }).textContent).toContain("Chapter requirements");
+    expect(within(screen.getByRole("region", { name: "Guided Mode requirements" })).getByRole("heading", { name: /^Launch Week/ })).toBeTruthy();
     const recovery = screen.getByRole("region", { name: "Incident recovery" });
     expect(recovery.textContent).toContain("Latency below 500 ms");
     expect(recovery.textContent).toContain("Service errors below 1%");
@@ -249,6 +282,22 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expect(within(classicMenu).queryByRole("region", { name: "Cloud saves" })).toBeNull();
   openTab(classicMenu, "Playtest");
   expect(within(classicMenu).getByRole("region", { name: "Playtest data" })).toBeTruthy();
+});
+
+it("sets the playtest session and build IDs in selectable code, and leaves their placeholders as prose", () => {
+  vi.stubEnv("VITE_BUILD_ID", "playtest-2026-11-05");
+  try {
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    const menu = openMenu(); openTab(menu, "Playtest");
+    const notes = within(menu).getByText(/^Session:/, { selector: "p" });
+    const session = useGame.getState().measurement.session!.id;
+    expect([...notes.querySelectorAll("code")].map((code) => code.textContent)).toEqual([session, "playtest-2026-11-05"]);
+    expect(notes.textContent).toBe(`Session: ${session} · Build: playtest-2026-11-05`);
+    vi.unstubAllEnvs(); vi.stubEnv("VITE_BUILD_ID", "");
+    act(() => useGame.setState((s) => ({ measurement: { ...s.measurement, session: null } })));
+    expect(notes.querySelector("code")).toBeNull();
+    expect(notes.textContent).toBe("Session: Not started · Build: dev/unrecorded");
+  } finally { vi.unstubAllEnvs(); }
 });
 
 it("lands the bankrupt company's menu on Saves, where Export and New company are", () => {

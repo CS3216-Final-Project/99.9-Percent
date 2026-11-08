@@ -2,10 +2,15 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
-import { DEFAULT_META, saveMeta } from "@/game/persist";
+import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "@/game/persist";
 import { FULL_SCOPE, PHONE_SCOPE } from "@/game/scope";
 import { useGame } from "@/game/store";
-import { finishingScaling } from "@/sim/__tests__/dataFixture";
+import { BALANCE } from "@/sim";
+import { balanced, runBot } from "@/sim/__tests__/bots";
+import { wonCompany } from "@/sim/__tests__/completionFixture";
+import { dataCompany, finishingScaling } from "@/sim/__tests__/dataFixture";
+import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
+import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { setEditionForTests } from "./edition";
 import { PHONE_MENU_TABS } from "./PhoneMenu";
 
@@ -92,6 +97,67 @@ describe("phone edition", () => {
     expect(within(menu).getByText("Phone campaign complete")).toBeTruthy();
     fireEvent.click(within(within(menu).getByRole("region", { name: "Game mode" })).getByRole("button", { name: "Switch to Challenge Mode" }));
     expect(useGame.getState().mode).toBe("classic");
+  });
+
+  it("announces a completed phone company that cannot be saved before losing it", async () => {
+    await renderPhone();
+    act(() => useGame.setState({ game: finishingScaling(), hasRun: true, started: true, onboarding: false, running: true, meta: { ...useGame.getState().meta, tutorialDone: true } }));
+    act(() => useGame.getState().advance());
+    const done = screen.getByRole("dialog", { name: "Phone campaign complete" });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Full"); });
+    fireEvent.click(within(done).getByRole("button", { name: "Play Challenge Mode" }));
+    expect(within(done).getByRole("alert").textContent).toContain("This company could not be saved");
+    fireEvent.click(within(done).getByRole("button", { name: "Switch and lose this company" }));
+    setItem.mockRestore();
+    expect(useGame.getState().mode).toBe("classic");
+    expect(screen.queryByRole("dialog", { name: "Phone campaign complete" })).toBeNull();
+  });
+
+  it("keeps a Challenge Mode company going past its Series A with no deadline in the dock or menu", async () => {
+    const won = runBot(BALANCE.introSeed, balanced, "expert").state;
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 }, "classic");
+    saveMode("classic");
+    saveClassicGame(won);
+    const choices = await renderPhone();
+    fireEvent.click(within(choices).getByRole("button", { name: "See your results" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Series A secured" })).getByRole("button", { name: "Keep playing" }));
+
+    const time = screen.getByRole("group", { name: "Time" });
+    expect(time.textContent).toContain(`Week ${won.turn}`);
+    expect(time.textContent).toContain("No deadline");
+    expect(within(time).queryByRole("progressbar", { name: "Weeks played" })).toBeNull();
+    // The Users goal moves on to the next milestone above the company's peak.
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
+    const numbers = screen.getByRole("region", { name: "Company numbers" });
+    expect(within(numbers).getByRole("progressbar", { name: "Progress to 100,000 users" })).toBeTruthy();
+    expect(numbers.textContent).toContain("Goal 100k");
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
+    const glance = within(openMenu()).getByRole("region", { name: "At a glance" });
+    expect(within(glance).getAllByRole("definition")[0].textContent).toBe(String(won.turn));
+  });
+
+  // A company continued from a larger screen can already be past the phone's last chapter. The chapter row names the
+  // chapter the engine is in, the same one the panel's checklist is headed with, never the phone's last chapter.
+  it.each([
+    ["Data Strategy", 3, () => dataCompany()],
+    ["Traffic Spikes & Autoscaling", 4, () => spikeCompany()],
+    ["Stay Online", 5, () => reliabilityCompany()],
+    ["Stay Online", 5, () => wonCompany()],
+  ])("names a later chapter, %s, in the chapter row as the panel does", async (name, number, company) => {
+    await renderPhone();
+    act(() => useGame.setState({ game: company(), hasRun: true, started: true, onboarding: false, meta: { ...useGame.getState().meta, tutorialDone: true } }));
+    const row = screen.getByRole("region", { name: "Guided Mode chapters" });
+    const heading = within(screen.getByRole("region", { name: "Guided Mode requirements" })).getByRole("heading", { level: 3 });
+    expect(heading.textContent).toMatch(new RegExp(`^${name.replace("&", "\\&")} · `));
+    expect(within(row).getByLabelText("Current chapter").textContent).toBe(name);
+    expect(within(row).getByText(`Chapter ${number} of 5`)).toBeTruthy();
+    expect(row.querySelector(".phone-chapter-count")?.textContent).toBe(`${number}/5`);
+    // The overview marks that chapter as where the company is, below the phone's own chapters.
+    fireEvent.click(within(row).getByRole("button", { name: "View chapters" }));
+    const overview = screen.getByRole("dialog", { name: "Guided Mode chapters" });
+    expect(within(overview).getAllByRole("heading", { level: 3 }).map((h) => h.textContent).slice(1)).toEqual(["Opening", "Scaling & Routing", name]);
+    expect(overview.querySelector('[aria-current="step"] h3')?.textContent).toBe(name);
   });
 
   it("describes a finished phone company on the home screen and lets it start Challenge Mode", async () => {

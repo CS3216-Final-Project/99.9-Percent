@@ -15,6 +15,7 @@ import {
   PROMOS,
   promoCooldownLeft,
   promoCost,
+  promoSpike,
   promoUsers,
   serverUpkeep,
   TECH,
@@ -232,7 +233,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                     {def.name}
                   </strong>
                   <span className="muted">
-                    +{num(promoUsers(game, pid))} users, +{pct(def.spike)} traffic
+                    +{num(promoUsers(game, pid))} users, +{pct(promoSpike(game, pid))} traffic
                   </span>
                 </div>
                 {!unlocked ? (
@@ -450,6 +451,6 @@ export default function SidePanel() {
   const [kept, setKept] = useState(shown);
   if (shown && shown !== kept) setKept(shown);
   return <EquipmentPanel label="Details">
-    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal></>}
+    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown} contentKey={kept}>{kept && <Inspector id={kept} />}</Reveal></>}
   </EquipmentPanel>;
 }

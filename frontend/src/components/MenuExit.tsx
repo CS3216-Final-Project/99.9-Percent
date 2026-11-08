@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Modal } from "./ui";
+import { useUnsavedWarning, withdrawUnsavedToast } from "./unsavedWarning";
 
-/** Exit is immediate only after the current progress has been saved successfully. */
+/**
+ * Exit is immediate only after the current progress has been saved successfully. Otherwise the confirmation, which is
+ * about the company not being saved, says so in place of any toast.
+ */
 export function useMenuExit() {
   const saveNow = useGame(s => s.saveNow);
   const endSession = useGame(s => s.endSession);
@@ -11,6 +15,7 @@ export function useMenuExit() {
   const [retryFailed, setRetryFailed] = useState(false);
   const exitButton = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
+  useUnsavedWarning(confirm);
   useEffect(() => {
     if (wasConfirming.current && !confirm) exitButton.current?.focus();
     wasConfirming.current = confirm;
@@ -18,7 +23,7 @@ export function useMenuExit() {
 
   const exit = () => {
     if (saveNow(true)) endSession();
-    else { setRetryFailed(false); setConfirm(true); }
+    else { withdrawUnsavedToast(); setRetryFailed(false); setConfirm(true); }
   };
   const dialog = confirm ? <Modal title="Exit without saving?" className="modal-menu modal-exit" icon={{ kind: "warn", name: "alert" }} onClose={() => setConfirm(false)}>
     <p>Your latest progress could not be fully saved. Retry saving before you leave, or choose Exit without saving.</p>
@@ -27,7 +32,7 @@ export function useMenuExit() {
       <button type="button" className="btn" onClick={() => setConfirm(false)}>Cancel</button>
       <button type="button" className="btn btn-primary" onClick={() => {
         if (saveNow(true)) endSession();
-        else setRetryFailed(true);
+        else { withdrawUnsavedToast(); setRetryFailed(true); }
       }}><Icon name="save" size={20} />Save and exit</button>
       <button type="button" className="btn btn-danger" onClick={endSession}><Icon name="logout" size={20} />Exit without saving</button>
     </div>

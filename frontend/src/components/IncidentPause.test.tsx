@@ -12,7 +12,7 @@ import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } fro
 
 // Construct engine-heavy companies once outside each UI interaction deadline.
 // Every test still receives isolated snapshots and exercises the real store/host.
-const transitions = new Map([1, 2, 3, 4, 5, 6].map(chapter => [chapter, pauseTransition(chapter)]));
+const transitions = new Map([1, 2, 3, 4, 5].map(chapter => [chapter, pauseTransition(chapter)]));
 const transition = (chapter: number) => structuredClone(transitions.get(chapter)!);
 const pointerLockDescriptor = Object.getOwnPropertyDescriptor(document, "pointerLockElement");
 
@@ -38,7 +38,7 @@ function startIncident() {
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   act(() => useGame.getState().tick(1));
 }
-it.each([1, 2, 3, 4, 5, 6])("gives the running Chapter %i transition immediate sole Pause attention without stopping time", chapter => {
+it.each([1, 2, 3, 4, 5])("gives the running Chapter %i transition immediate sole Pause attention without stopping time", chapter => {
   const { before, incident } = transition(chapter); show(before); startIncident();
   expect(useGame.getState().game.campaign!.incident!.id).toBe(incident.campaign!.incident!.id);
   expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(1);
@@ -146,7 +146,7 @@ it("does not defer a background incident invitation until focus returns", () => 
   fireEvent(window, new Event("focus")); expect(gold()).toHaveLength(0);
 });
 
-it.each([1, 2, 3, 4, 5, 6])("marks a running Chapter %i incident with the mouse captured, and keeps it through Escape", chapter => {
+it.each([1, 2, 3, 4, 5])("marks a running Chapter %i incident with the mouse captured, and keeps it through Escape", chapter => {
   show(transition(chapter).before); const canvas = document.createElement("canvas"); document.body.append(canvas);
   const lock = vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(canvas);
   fireEvent(document, new Event("pointerlockchange"));
