@@ -129,3 +129,67 @@ test('the landing page account link opens Sign in for a guest and nothing for a 
   await page.goto('/?signin=1');await expect(page.getByRole('button',{name:/Ada/})).toBeVisible();
   await expect(page).toHaveURL(url=>!url.searchParams.has('signin'));await expect(dialog).toBeHidden();
 });
+test('signing up with Google saves the guest company to the new account, once, and a failed upload can be retried',async({page,withoutRoom})=>{
+  await withoutRoom();
+  const account={id:'owner-new',displayName:'Nova'};
+  let signedIn=false,cloud:CloudRun|null=null,putCount=0,failNextPut=true;
+  await page.route('**/api/**',async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname;
+    // Like the server: the sign-up session is new until the account holds a cloud save.
+    if(path==='/api/session'){await route.fulfill({status:signedIn?200:401,json:signedIn?{account,csrfToken:'csrf-new',newAccount:!cloud}:{error:'guest'}});return;}
+    if(path==='/api/auth/google'){signedIn=true;await route.fulfill({status:302,headers:{location:'/?auth=signed-in'}});return;}
+    if(path==='/api/runs'&&req.method()==='GET'){await route.fulfill({json:cloud?[{runId:cloud.runId,revision:cloud.revision,updatedAt:cloud.updatedAt}]:[]});return;}
+    if(path.startsWith('/api/runs/')&&req.method()==='PUT'){
+      putCount++;
+      if(failNextPut){failNextPut=false;await route.fulfill({status:503,json:{error:'Accounts are temporarily unavailable. Local play is available.'}});return;}
+      const body=req.postDataJSON();expect(body.expectedRevision).toBe(cloud?.revision??0);
+      cloud={runId:body.envelope.runId,revision:(cloud?.revision??0)+1,envelope:body.envelope,updatedAt:'2026-10-10T00:00:00Z'};
+      await route.fulfill({json:cloud});return;
+    }
+    await route.fulfill({status:404,json:{error:'not found'}});
+  });
+  await seedSave(page,newGame(6,'signup-company'));await page.goto('/');
+  await page.getByRole('button',{name:/Sign in/}).click();
+  await page.getByRole('dialog',{name:'Account'}).getByRole('link',{name:'Continue with Google'}).click();
+  await expect(page).toHaveURL(/auth=signed-in/);
+  // The first upload fails: the company stays in this browser and the player is told how to retry.
+  await expect(page.getByRole('alert').filter({hasText:'could not be saved to your account yet'})).toBeVisible();
+  expect(putCount).toBe(1);expect((await savedGame(page)).campaign!.runId).toBe('signup-company');
+  await page.getByRole('button',{name:/Nova/}).click();
+  const dialog=page.getByRole('dialog',{name:'Account'});
+  await expect(dialog.getByText('Accounts are temporarily unavailable. Local play is available.',{exact:true})).toBeVisible();
+  await expect(dialog.getByText('No cloud saves yet.')).toBeVisible();
+  await dialog.getByRole('button',{name:'Save to cloud',exact:true}).click();
+  await expect(dialog.getByText('Saved to the cloud.',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('listitem')).toContainText('Guided Mode save (this game)');
+  expect(putCount).toBe(2);
+  // A later visit is a returning sign-in: nothing uploads unasked.
+  await page.reload();await expect(page.getByRole('button',{name:/Nova/})).toBeVisible();
+  await page.getByRole('button',{name:/Nova/}).click();
+  await expect(dialog.getByText('Signed in. Nothing is uploaded until you choose Save to cloud.',{exact:true})).toBeVisible();
+  expect(putCount).toBe(2);
+});
+test('a Google sign-up saves the guest company unasked and confirms it',async({page,withoutRoom})=>{
+  await withoutRoom();
+  let cloud:CloudRun|null=null;
+  await page.route('**/api/**',async route=>{
+    const req=route.request(),path=new URL(req.url()).pathname;
+    if(path==='/api/session'){await route.fulfill({json:{account:{id:'owner-new',displayName:'Nova'},csrfToken:'csrf-new',newAccount:!cloud}});return;}
+    if(path==='/api/runs'&&req.method()==='GET'){await route.fulfill({json:cloud?[{runId:cloud.runId,revision:cloud.revision,updatedAt:cloud.updatedAt}]:[]});return;}
+    if(path.startsWith('/api/runs/')&&req.method()==='PUT'){
+      const body=req.postDataJSON();cloud={runId:body.envelope.runId,revision:1,envelope:body.envelope,updatedAt:'2026-10-10T00:00:00Z'};
+      await route.fulfill({json:cloud});return;
+    }
+    await route.fulfill({status:404,json:{error:'not found'}});
+  });
+  // The Google callback returns here once the account exists.
+  await seedSave(page,newGame(6,'signup-company'));await page.goto('/?auth=signed-in');
+  await expect(page.getByRole('status').filter({hasText:'Your progress is saved to your account.'})).toBeVisible();
+  await page.screenshot({path:'test-results/account-signup-saved.png'});
+  expect(cloud!.runId).toBe('signup-company');
+  await page.getByRole('button',{name:/Nova/}).click();
+  const dialog=page.getByRole('dialog',{name:'Account'});
+  await expect(dialog.getByText('In the cloud as version 1')).toBeVisible();
+  await expect(dialog.getByRole('listitem')).toContainText('Guided Mode save (this game)');
+  await page.screenshot({path:'test-results/account-signup-dialog.png'});
+});
