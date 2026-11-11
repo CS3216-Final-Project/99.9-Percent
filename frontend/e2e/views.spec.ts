@@ -267,7 +267,9 @@ test("seen from the avatar the elevator simply rides, without the overview's cut
   await showMap(page);
   await stage(page).focus();
   await page.keyboard.press("v");
-  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  // The camera changes on the room's second or third frame after V, and on software WebGL each frame from the avatar
+  // has taken up to 3 s, with Playwright's own polls queued behind them; CI has run past 10 s.
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective", { timeout: 20_000 });
   await page.keyboard.press("PageUp");
   // Through the whole ride the dimming and passing shaft stay away.
   const dims: number[] = [];
