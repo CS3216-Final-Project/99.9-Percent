@@ -94,6 +94,7 @@ Storage can be missing, full or corrupt; each reader validates what it loads and
 | `nn.classic.save.v1`, `nn.classic.meta.v1` | Challenge Mode save and profile | `game/persist.ts` |
 | `nn.campaign.exploration.v1`, `nn.classic.exploration.v1` | Floor in view, walk mode and chosen view, per mode | `game/exploration.ts` |
 | `nn.mode.v1` | Last played mode | `game/persist.ts` |
+| `nn.booth.v1` | Booth play on `/steps`: the visitor's leaderboard name, their run's seed and submission ID, and where the post placed | `game/booth.ts` |
 | `nn.audio.v1`, `nn.music.v1` | Volumes and mute; the music key is kept for older builds | `game/persist.ts` |
 | `nn.graphics.v1`, `nn.controls.v1`, `nn.map.v1`, `nn.avatar.v1`, `nn.timeOfDay.v1` | Graphics quality, look controls, minimap folded, avatar, time of day | `game/persist.ts` |
 | `nn.analytics-consent.v1` | Product analytics opt-out choice | `lib/analytics.ts` |

@@ -7,6 +7,7 @@ import { authRouter } from './routes/auth.js';
 import { runsRouter } from './routes/runs.js';
 import { feedbackRouter } from './routes/feedback.js';
 import { statsRouter } from './routes/stats.js';
+import { leaderboardRouter } from './routes/leaderboard.js';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api', authRouter);
 app.use('/api/runs', runsRouter);
 app.use('/api/feedback', feedbackRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/dialogue', dialogueRouter);
 

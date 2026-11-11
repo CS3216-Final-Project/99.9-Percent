@@ -1,4 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../shared"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ../shared",
+  "rewrites": [
+    { "source": "/steps", "destination": "/index.html" },
+    { "source": "/steps/board", "destination": "/index.html" },
+    { "source": "/leaderboard", "destination": "/index.html" }
+  ]
 }

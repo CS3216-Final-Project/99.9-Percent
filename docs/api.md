@@ -15,6 +15,8 @@ The browser calls public routes directly at `VITE_API_URL` (local: `http://local
 | GET | `/api/health/db` | `HealthResponse` | 503 when the database is unreachable |
 | GET | `/api/stats` | `PublicStats` (`backend/src/routes/stats.ts`) | Sign-up and cloud-save counts for the landing page, cached for 60 s; 503 with `no-store` when the database is unavailable |
 | POST | `/api/feedback` | `FeedbackRequest` / `FeedbackResponse` (`shared/feedback.ts`) | Anonymous player feedback, see below |
+| GET | `/api/leaderboard` | `LeaderboardResponse` (`shared/leaderboard.ts`) | Booth leaderboard: top 10 and latest 6 visible posts, cached for 5 s; 503 with `no-store` when the database is unavailable |
+| POST | `/api/leaderboard` | `LeaderboardSubmission` / `LeaderboardSubmitResponse` | Post a booth score, see below |
 | POST | `/api/dialogue` | `DialogueRequest` / `DialogueResponse` (`shared/dialogue.ts`) | Retained from the earlier LingoQuest project; unused by the game |
 
 ### Feedback
@@ -33,6 +35,24 @@ The body is `{ id, message, mode }`: a random UUID v4 submission ID, 1 to 2,000 
 The client reuses the submission ID while the text is unchanged, so a lost response never duplicates a row, and it times out after 15 seconds.
 Only the message, mode and ID are sent; no saves, records, emails or tokens.
 There is no route that reads feedback.
+
+### Booth leaderboard
+
+For showcases. `/steps` on the game asks a visitor for a name, starts a fresh Challenge Mode company and posts its report score (0 to 100, `sim/report.ts`) when the run ends, or earlier when the visitor presses Finish & post.
+`/steps/board` (also `/leaderboard`) is a big-screen board that refreshes every 8 seconds; `?steps` and `?steps=board` work on any path.
+The body is `{ id, name, score, grade, weeks, users, outcome }`: a random UUID v4 per run, a 1 to 16 character name of letters, digits, spaces and `_ . ' -`, and the report's score, grade, weeks played, peak users and outcome (`won`, `bankrupt`, `deadline`, or `unfinished` for a run ended early).
+
+| Status | Meaning |
+| --- | --- |
+| 201 `{ id, rank, total }` | Stored in `game_leaderboard`; `rank` is the place among visible posts (higher score first, then the earlier post) |
+| 200 `{ id, rank, total }` | Identical retry of an already stored post |
+| 400 | Invalid ID, name or result |
+| 409 | The ID was already used for a different result |
+| 503 | Database unavailable |
+
+Scores are reported by the browser and are not verified; the board is for fun, not proof of play.
+To take a post off the board, set `hidden` to true on its `game_leaderboard` row in the Neon console; to clear the board after a rehearsal, hide or delete the rows.
+Responses never include IDs or hidden posts.
 
 ## Account routes
 
