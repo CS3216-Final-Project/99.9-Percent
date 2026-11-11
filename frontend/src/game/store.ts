@@ -354,6 +354,13 @@ interface Store {
    */
   switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
   /**
+   * Booth play (`/steps`): start a fresh Challenge Mode company with its first-week walkthrough, even where Challenge
+   * Mode is still locked. The previous Guided Mode run is saved first; a previous Challenge Mode run is replaced.
+   * With `resumeSeed`, the saved Challenge Mode company with that seed is continued instead, for example after a
+   * reload put a locked device back in Guided Mode; a fresh company starts only when that save is gone.
+   */
+  startBoothRun: (resumeSeed?: number) => boolean;
+  /**
    * Whether nothing but saving stands in the way of switching to `mode`: no cloud action is in progress and the mode
    * is unlocked. After a refused switch it tells a failed save, which may be overridden, from the other refusals.
    */
@@ -1266,6 +1273,23 @@ export const useGame = create<Store>()((set, get) => {
       saveMode(mode);
       track("mode_switched", { to: mode });
       enter(mode, true);
+      return true;
+    },
+    startBoothRun: (resumeSeed) => {
+      if(get().cloudBusy){get().notify("Wait for the cloud operation before starting.","info");return false;}
+      if(get().mode!=="classic") {
+        persist();
+        saveMode("classic");
+        enter("classic", true);
+      }
+      if(resumeSeed!==undefined && !get().game.campaign && get().game.seed===resumeSeed) {
+        set({ started: true, ...openingView() });
+        return true;
+      }
+      get().newRun();
+      const tour: Tour = { track: "basics", step: 0 };
+      set({ tour, ...openingView() });
+      recordTour("started", tour, { from: "new_company" });
       return true;
     },
     canSwitchMode: (mode) => !get().cloudBusy && (mode !== "classic" || challengeUnlockedNow()),

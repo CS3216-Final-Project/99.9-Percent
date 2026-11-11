@@ -14,6 +14,7 @@ The home screen offers two modes, each with its own save.
 | Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt, then optionally keep playing with no deadline |
 
 Challenge Mode is locked until all five Guided Mode chapters (Opening to Stay Online) are complete.
+The showcase booth address `/steps` is the one exception: it asks for a leaderboard name, then starts a fresh Challenge Mode company with the first-week walkthrough on that device, replacing any Challenge Mode save there (see [api.md](api.md#booth-leaderboard)).
 Once unlocked, a player can switch between modes without losing either save.
 
 ## Guided Mode

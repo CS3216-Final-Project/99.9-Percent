@@ -13,6 +13,7 @@ Dates are 2026, Singapore time.
 - Replay creates a new company with different seeded conditions.
 - The stack stays React, Vite, Zustand and Three.js in the browser, with Express, Drizzle and Neon on Vercel; simulation stays client-side.
 - Out of scope: multiplayer, server-authoritative gameplay, leaderboards, player-deployable queues, multi-region systems, database failover, network or security incident models and AI-generated content.
+  The one exception is the STePS booth leaderboard (`/steps`, [api.md](api.md#booth-leaderboard)): opt-in by address, unverified and outside the default player flow.
 
 ## Status
 

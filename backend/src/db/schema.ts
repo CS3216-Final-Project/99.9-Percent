@@ -4,6 +4,7 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   index,
   integer,
@@ -117,6 +118,31 @@ export const gameRuns = pgTable('game_runs', {
   revision: integer().notNull(), envelope: jsonb().$type<import('../../../shared/campaign.ts').CampaignEnvelope>().notNull(),
   updatedAt: timestamp({withTimezone:true}).notNull().defaultNow(),
 }, t => [check('game_runs_positive_revision', sql`${t.revision} > 0`), index('game_runs_owner_updated_idx').on(t.accountId, t.updatedAt)]);
+
+/**
+ * Booth leaderboard posts (`/steps`). Anonymous and browser-reported. Set `hidden` to take an entry off the board
+ * without deleting it.
+ */
+export const gameLeaderboard = pgTable('game_leaderboard', {
+  id: uuid().primaryKey().defaultRandom(),
+  name: text().notNull(),
+  score: integer().notNull(),
+  grade: text().$type<'S' | 'A' | 'B' | 'C' | 'D'>().notNull(),
+  weeks: integer().notNull(),
+  users: integer().notNull(),
+  outcome: text().$type<'won' | 'bankrupt' | 'deadline' | 'unfinished'>().notNull(),
+  hidden: boolean().notNull().default(false),
+  createdAt: createdAt(),
+}, t => [
+  index('game_leaderboard_rank_idx').on(t.score.desc(), t.createdAt),
+  index('game_leaderboard_created_idx').on(t.createdAt),
+  check('game_leaderboard_name_length', sql`char_length(${t.name}) between 1 and 16`),
+  check('game_leaderboard_score_range', sql`${t.score} between 0 and 100`),
+  check('game_leaderboard_grade', sql`${t.grade} in ('S', 'A', 'B', 'C', 'D')`),
+  check('game_leaderboard_weeks_range', sql`${t.weeks} between 0 and 520`),
+  check('game_leaderboard_users_range', sql`${t.users} between 0 and 1000000000`),
+  check('game_leaderboard_outcome', sql`${t.outcome} in ('won', 'bankrupt', 'deadline', 'unfinished')`),
+]);
 
 /** Anonymous player feedback, independent of accounts and browser saves. */
 export const gameFeedback = pgTable('game_feedback', {
