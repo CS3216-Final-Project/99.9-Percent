@@ -222,7 +222,7 @@ export interface Campaign {
     routing: Routing;
     loadBalancer: boolean;
     routingEnabledOnce: boolean;
-    scaling: null | { id: "application-scaling"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean };
+    scaling: null | { id: "application-scaling"; version: 1 | 2; enteredStep: number; dueStep: number | null; consumed: boolean };
     dataStage: DataStage | null;
     readCache: ReadCache | null;
     spikeStage: SpikeStage | null;

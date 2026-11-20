@@ -53,6 +53,7 @@ const TARGETS: Record<GuidanceTarget, string> = {
   network: '.campaign-panel [data-tutorial="inspect-gateway"]',
   monitoring: '.campaign-panel [data-tutorial="inspect-monitoring"]',
   requirements: ".chapter-actions > button:last-child",
+  launch: '[data-guidance="review-launch"]',
   next: ".chapter-advance",
   reliability: '[data-guidance="arm_reliability"]',
   risk: '[aria-label="Scaling growth risk"] > button',
@@ -283,7 +284,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     const update = () => {
       clear();
       target = visibleControl(TARGETS[decision.target!]) ??
-        (["risk", "reliability", "growth"].includes(decision.target!) ? visibleControl(PANEL_ENTRY) : null) ?? visibleControl(".campaign-hint");
+        (["risk", "reliability", "growth", "launch"].includes(decision.target!) ? visibleControl(PANEL_ENTRY) : null) ?? visibleControl(".campaign-hint");
       target?.classList.add("campaign-gold-attention");
     };
     update();

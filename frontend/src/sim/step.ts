@@ -1,3 +1,4 @@
+import { scalingLaunchBlocker } from "./scalingLaunch";
 import { introductionActive, introductionAction } from "./introduction";
 import { completionAction } from "./campaignCompletion";
 import { captureScorecard, emptyServiceMeasurement, observeService } from "./campaignScorecard";
@@ -107,10 +108,10 @@ export function enterScaling(s: GameState): GameState {
     enterScalingInPlace(next);
     return next;
 }
-function enterScalingInPlace(s: GameState): void {
+function enterScalingInPlace(s: GameState, version: 1 | 2 = 1): void {
     const c = s.campaign!;
-    c.scaling = { id: P.id, version: P.version, enteredStep: c.step, dueStep: null, consumed: false };
-    trace(c, "scaling-stage-entered", { continuationId: P.id, continuationVersion: P.version, configuration:JSON.stringify(P) });
+    c.scaling = { id: P.id, version, enteredStep: c.step, dueStep: null, consumed: false };
+    trace(c, "scaling-stage-entered", { continuationId: P.id, continuationVersion: version, configuration:JSON.stringify(P) });
 }
 export function canEnterData(s: GameState): boolean {
  const c=s.campaign;
@@ -302,14 +303,14 @@ export function stepInPlace(s: GameState): StopReason {
     if (c.scaling && !c.scaling.consumed) {
         const ready = c.openingMilestone?.acknowledged && (c.dbCapacity >= P.dbCapacity || !!c.scalingConsent) && s.phase === "management" &&
             !c.incident && c.dbBacklog === 0 && c.apps.every(a=>a.backlog===0);
-        if (ready && c.scaling.dueStep === null) {
+        if (c.scaling.version === 1 && ready && c.scaling.dueStep === null) {
             c.scaling.dueStep = c.step + P.observationSteps;
             trace(c,"traffic-scheduled",{eventId:"scaling-growth",dueStep:c.scaling.dueStep,continuationVersion:P.version});
         }
-        if (ready && c.scaling.dueStep !== null && c.step >= c.scaling.dueStep) {
+        if ((c.scaling.version === 2 || ready) && c.scaling.dueStep !== null && c.step >= c.scaling.dueStep) {
             const from = c.incomingRate; c.incomingRate = P.traffic; c.scaling.consumed = true;
             c.consumedEvents.push("scaling-growth");
-            trace(c,"traffic-change",{eventId:"scaling-growth",from,to:P.traffic,scheduledStep:c.scaling.dueStep,actualStep:c.step,continuationVersion:P.version});
+            trace(c,"traffic-change",{eventId:"scaling-growth",from,to:P.traffic,scheduledStep:c.scaling.dueStep,actualStep:c.step,continuationVersion:c.scaling.version});
         }
     }
     if(c.dataStage && !c.dataStage.consumed) {
@@ -572,6 +573,7 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
         return null;
     }
     if (action.type === "acknowledge_milestone") {
+        if (action.scalingVersion !== undefined && action.scalingVersion !== 2) return fail("Unknown Scaling launch version.");
         const c = s.campaign!;
         if (s.phase !== "management") return fail("Finish the active incident or review before acknowledging Opening.");
         if (!c.openingMilestone || c.openingMilestone.acknowledged) return fail("No milestone awaits acknowledgement.");
@@ -579,13 +581,23 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
         if (c.launchWeek && c.launchWeek.completedStep===null) return fail("Finish Launch Week first.");
         c.openingMilestone.acknowledged = true;
         trace(c, "milestone-acknowledged");
-        if (action.enterScaling !== false) enterScalingInPlace(s);
+        if (action.enterScaling !== false) enterScalingInPlace(s, action.scalingVersion);
         return null;
     }
     if (action.type === "enter_scaling") {
+        if (action.version !== undefined && action.version !== 2) return fail("Unknown Scaling launch version.");
         if (!s.campaign?.openingMilestone?.acknowledged || (!legacyPreventionMilestone && !(s.campaign.launchWeek ? s.campaign.launchWeek.completedStep !== null : completedOpening(s.campaign))) || s.campaign.scaling || s.phase === "ended") return fail("Scaling requires an acknowledged verified Opening milestone and must not already be entered.");
         if (s.campaign.launchWeek && s.campaign.launchWeek.completedStep===null) return fail("Finish Launch Week first.");
-        enterScalingInPlace(s);
+        enterScalingInPlace(s, action.version);
+        return null;
+    }
+    if (action.type === "launch_scaling") {
+        const reason = scalingLaunchBlocker(s);
+        if (reason) return fail(reason);
+        const c = s.campaign!;
+        c.scaling!.dueStep = c.step + P.observationSteps;
+        trace(c, "scaling-launch-requested", { dueStep: c.scaling!.dueStep, incoming: c.incomingRate, nextDemand: P.traffic, dbCapacity: c.dbCapacity });
+        trace(c, "traffic-scheduled", { eventId: "scaling-growth", dueStep: c.scaling!.dueStep, continuationVersion: 2 });
         return null;
     }
     if(action.type==="enter_data") {

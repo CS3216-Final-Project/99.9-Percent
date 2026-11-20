@@ -101,26 +101,6 @@ function Progress({ x, z, progress }: { x: number; z: number; progress: number }
   );
 }
 
-/** The green ring a change gives off the second it activates. */
-function Pop({ x, z }: { x: number; z: number }) {
-  const ring = useRef<THREE.Mesh>(null);
-  const born = useRef<number | null>(null);
-  useFrame(({ clock }) => {
-    if (!ring.current) return;
-    born.current ??= clock.elapsedTime;
-    const p = Math.min(1, (clock.elapsedTime - born.current) / 1.2);
-    ring.current.visible = p < 1;
-    ring.current.scale.setScalar(0.6 + p * 1.6);
-    (ring.current.material as THREE.MeshBasicMaterial).opacity = 1 - p;
-  });
-  return (
-    <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.07, z]}>
-      <ringGeometry args={[0.7, 0.9, 40]} />
-      <meshBasicMaterial color={GHOST.done} transparent depthWrite={false} toneMapped={false} />
-    </mesh>
-  );
-}
-
 const anchorOf = (parts: GhostPart[]) => {
   const p = parts.find(x => x.type !== "cable") ?? parts[0];
   if (!p) return null;
@@ -129,7 +109,7 @@ const anchorOf = (parts: GhostPart[]) => {
 
 /**
  * Ghosts of changes in the room: the one the player is pointing at or confirming flashes in gold, changes already
- * paid for stand steady with a progress ring, and each gives off a green ring the moment it activates.
+ * paid for stand steady with a progress ring. Completed changes are handled by MachineFeedback.
  */
 export function Ghosts({ campaign, layout }: { campaign: Campaign; layout: FloorLayout }) {
   const previewAction = useGame(s => s.previewAction);
@@ -142,12 +122,6 @@ export function Ghosts({ campaign, layout }: { campaign: Campaign; layout: Floor
     const parts = ghostParts(changeOfScheduled(x.action), campaign, layout, x.extraApps);
     return { id: x.action.id, parts, progress: x.progress, at: anchorOf(parts) };
   }), [campaign, layout]);
-  // Positions where a change activated this second, read from the record so a reload never replays them.
-  const pops = useMemo(() => campaign.actions.filter(a => a.activatedStep === campaign.step && a.source !== "autoscaler").map(a => {
-    // A new server has already joined the fleet by now, so it stands in the last slot rather than the next.
-    const parts = ghostParts(changeOfScheduled(a), campaign, layout, a.type === "add-app" || a.type === "create-spare" ? -1 : 0);
-    return { id: a.id, at: anchorOf(parts) };
-  }), [campaign, layout]);
   return (
     <group>
       {preview.map((part, i) => <Part key={`p${i}`} part={part} flashing />)}
@@ -157,7 +131,6 @@ export function Ghosts({ campaign, layout }: { campaign: Campaign; layout: Floor
           {p.at && <Progress x={p.at.x} z={p.at.z} progress={p.progress} />}
         </group>
       ))}
-      {pops.map(p => p.at && <Pop key={p.id} x={p.at.x} z={p.at.z} />)}
     </group>
   );
 }

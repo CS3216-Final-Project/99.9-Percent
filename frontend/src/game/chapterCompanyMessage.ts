@@ -31,7 +31,9 @@ export function chapterCompanyMessage(game: GameState) {
   const slow = c.snapshot.latencyMs >= 500 || c.snapshot.app.backlog > 0 || c.snapshot.db.backlog > 0;
   // Maya already introduced herself in the introduction's welcome, so Opening skips her greeting.
   const told = lines.slice(chapter === 1 && c.completedIntroduction ? 1 : 0);
-  const said: readonly string[] = chapter === 1 && slow ? ["Maya from Customer Support here. My inbox is lighting up!", "Customers are reporting that our website is getting slower. Can you find out what's causing it?"]
+  const said: readonly string[] = chapter === 2 && c.scaling?.version===2
+    ? ["Alex here. Marketing is ready to bring in more customers.", "You decide when we launch. More traffic can earn more revenue, if our infrastructure can serve it.", "Prepare first, or take the risk with what we have. The launch opportunity is in System metrics."]
+    : chapter === 1 && slow ? ["Maya from Customer Support here. My inbox is lighting up!", "Customers are reporting that our website is getting slower. Can you find out what's causing it?"]
     : told;
   return { ...COLLEAGUES[speaker], speaker, lines: said, mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };
 }
